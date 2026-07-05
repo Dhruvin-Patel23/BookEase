@@ -1,1 +1,52 @@
 @import "tailwindcss";
+
+@theme {
+  --font-heading: "Poppins", sans-serif;
+  --font-body: "Inter", sans-serif;
+}
+
+@layer base {
+  body {
+    font-family: var(--font-body);
+    color: theme(colors.slate.600);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-heading);
+    color: theme(colors.slate.900);
+    font-weight: 700;
+  }
+
+  h1 {
+    @apply text-5xl md:text-6xl font-extrabold leading-tight;
+  }
+  h2 {
+    @apply text-3xl font-bold;
+  }
+  h3 {
+    @apply text-lg font-semibold;
+  }
+
+  p {
+    @apply text-slate-600 leading-relaxed;
+  }
+
+  a {
+    font-family: var(--font-body);
+  }
+}
+
+@layer utilities {
+  /* Use on any heading that sits on a dark/gradient background */
+  .text-on-dark {
+    color: white;
+  }
+  .text-on-dark-muted {
+    color: theme(colors.blue.100);
+  }
+}
