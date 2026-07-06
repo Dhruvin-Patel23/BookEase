@@ -1,5 +1,12 @@
 import { useState } from "react";
-import { Calendar, User, Briefcase, ArrowRight } from "lucide-react";
+import {
+  Calendar,
+  User,
+  Briefcase,
+  ArrowRight,
+  Eye,
+  EyeOff,
+} from "lucide-react";
 import Btn from "../../components/common/Btn";
 import api from "../../api/client";
 
@@ -19,17 +26,21 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, role }),
-      });
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/auth/login`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password, role }),
+        },
+      );
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Login failed");
@@ -147,15 +158,31 @@ export default function LoginPage() {
               Password
             </label>
           </div>
-          <input
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••••"
-            className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-          />
-          <div className="text-right mb-6 mt-2">
+
+          <div className="relative mb-2">
+            <input
+              type={showPassword ? "text" : "password"}
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••••"
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 pr-12 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            />
+
+            <button
+              type="button"
+              onClick={() => setShowPassword((prev) => !prev)}
+              className="absolute inset-y-0 right-4 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              {showPassword ? (
+                <EyeOff className="w-5 h-5" />
+              ) : (
+                <Eye className="w-5 h-5" />
+              )}
+            </button>
+          </div>
+
+          <div className="text-right mb-6">
             <a
               href="/forgot-password"
               className="text-blue-600 text-sm font-medium hover:underline"

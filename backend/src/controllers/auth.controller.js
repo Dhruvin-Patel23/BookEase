@@ -1,10 +1,10 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const Authentication = require("../models/Authentication.model");
+const crypto = require("crypto");
 const User = require("../models/User.model");
-
-const LOCK_TIME = 15 * 60 * 1000; // 15 minutes
-const MAX_ATTEMPTS = 5;
+const Client = require("../models/Client.model");
+const ServiceProvider = require("../models/ServiceProvider.model");
+const { sendOTPEmail } = require("../services/email.service");
 
 // ── Register ────────────────────────────────────────────────────────
 exports.register = async (req, res) => {
@@ -13,15 +13,16 @@ exports.register = async (req, res) => {
       name,
       email,
       phone,
-      gender,
       password,
       role,
       specialization,
       address,
+      businessName,
+      bio,
     } = req.body;
 
-    // 1. Validate required fields
-    if (!name || !email || !password || !role || !gender) {
+    // 1. Validate
+    if (!name || !email || !password || !role) {
       return res.status(400).json({ message: "All fields are required." });
     }
     if (!["client", "provider"].includes(role)) {
@@ -33,17 +34,13 @@ exports.register = async (req, res) => {
         .json({ message: "Password must be at least 8 characters." });
     }
     if (role === "provider" && (!specialization || !address)) {
-      return res
-        .status(400)
-        .json({
-          message: "Specialization and address are required for providers.",
-        });
+      return res.status(400).json({
+        message: "Specialization and address are required for providers.",
+      });
     }
 
-    // 2. Check email not already taken
-    const existing = await Authentication.findOne({
-      email: email.toLowerCase(),
-    });
+    // 2. Check duplicate email
+    const existing = await User.findOne({ email: email.toLowerCase() });
     if (existing) {
       return res
         .status(409)
@@ -56,23 +53,31 @@ exports.register = async (req, res) => {
     // 4. Create User
     const user = await User.create({
       name,
-      phoneNo: phone,
-      gender,
-      role,
-      ...(role === "provider" && {
-        providerProfile: { specialization, address },
-      }),
-    });
-
-    // 5. Create Authentication record linked to User
-    await Authentication.create({
       email: email.toLowerCase(),
       password: hashed,
-      user: user._id,
-      isVerified: true,
+      phone,
+      role,
     });
 
-    // 6. Issue JWT
+    // 5. Create role-specific profile
+    if (role === "client") {
+      await Client.create({
+        user: user._id,
+      });
+    }
+
+    if (role === "provider") {
+      await ServiceProvider.create({
+        user: user._id,
+        businessName: businessName || name,
+        specialization,
+        address,
+        bio: bio || "",
+        contactEmail: email.toLowerCase(),
+      });
+    }
+
+    // 6. Sign JWT
     const token = jwt.sign(
       { userId: user._id, role: user.role },
       process.env.JWT_SECRET,
@@ -84,7 +89,7 @@ exports.register = async (req, res) => {
       user: {
         id: user._id,
         name: user.name,
-        email: email.toLowerCase(),
+        email: user.email,
         role: user.role,
       },
     });
@@ -99,7 +104,6 @@ exports.login = async (req, res) => {
   try {
     const { email, password, role } = req.body;
 
-    // 1. Validate required fields
     if (!email || !password || !role) {
       return res
         .status(400)
@@ -109,56 +113,24 @@ exports.login = async (req, res) => {
       return res.status(400).json({ message: "Invalid role." });
     }
 
-    // 2. Find auth record + linked user
-    const auth = await Authentication.findOne({ email: email.toLowerCase() })
-      .select("+password +failedLoginAttempts +lockUntil")
-      .populate("user");
-
-    if (!auth || !auth.user) {
+    const user = await User.findOne({ email: email.toLowerCase() }).select(
+      "+password",
+    );
+    if (!user) {
       return res.status(401).json({ message: "Invalid email or password." });
     }
 
-    // 3. Check account lock
-    if (auth.lockUntil && auth.lockUntil > Date.now()) {
-      const minutesLeft = Math.ceil((auth.lockUntil - Date.now()) / 60000);
-      return res
-        .status(423)
-        .json({ message: `Account locked. Try again in ${minutesLeft} min.` });
-    }
-
-    // 4. Check role matches
-    if (auth.user.role !== role) {
+    if (user.role !== role) {
       return res.status(401).json({ message: "Invalid email or password." });
     }
 
-    // 5. Check account is active
-    if (!auth.isActive) {
-      return res
-        .status(403)
-        .json({ message: "This account has been deactivated." });
-    }
-
-    // 6. Compare password
-    const isMatch = await bcrypt.compare(password, auth.password);
+    const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      auth.failedLoginAttempts += 1;
-      if (auth.failedLoginAttempts >= MAX_ATTEMPTS) {
-        auth.lockUntil = Date.now() + LOCK_TIME;
-        auth.failedLoginAttempts = 0;
-      }
-      await auth.save();
       return res.status(401).json({ message: "Invalid email or password." });
     }
 
-    // 7. Successful login — reset security counters
-    auth.failedLoginAttempts = 0;
-    auth.lockUntil = undefined;
-    auth.lastLogin = new Date();
-    await auth.save();
-
-    // 8. Issue JWT
     const token = jwt.sign(
-      { authId: auth._id, userId: auth.user._id, role: auth.user.role },
+      { userId: user._id, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: "7d" },
     );
@@ -166,14 +138,128 @@ exports.login = async (req, res) => {
     res.json({
       token,
       user: {
-        id: auth.user._id,
-        name: auth.user.name,
-        email: auth.email,
-        role: auth.user.role,
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
       },
     });
   } catch (err) {
     console.error("Login error:", err.message);
     res.status(500).json({ message: "Server error during login." });
+  }
+};
+// ── Send OTP ────────────────────────────────────────────────────────
+exports.sendOTP = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ message: "Email is required." });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    // always return success to prevent user enumeration
+    if (!user) {
+      return res.status(404).json({
+        message: "No account found with this email. Please create an account.",
+      });
+    }
+    // generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expires = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+    user.resetOTP = otp;
+    user.resetOTPExpires = expires;
+    user.resetOTPVerified = false;
+    await user.save();
+
+    await sendOTPEmail(user.email, otp);
+
+    res.json({ message: "If that email exists, an OTP has been sent." });
+  } catch (err) {
+    console.error("Send OTP error:", err.message);
+    res.status(500).json({ message: "Server error." });
+  }
+};
+
+// ── Verify OTP ──────────────────────────────────────────────────────
+exports.verifyOTP = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    if (!email || !otp) {
+      return res.status(400).json({ message: "Email and OTP are required." });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() }).select(
+      "+resetOTP +resetOTPExpires +resetOTPVerified",
+    );
+
+    if (!user || !user.resetOTP) {
+      return res.status(400).json({ message: "Invalid or expired OTP." });
+    }
+    if (user.resetOTPExpires < Date.now()) {
+      return res
+        .status(400)
+        .json({ message: "OTP has expired. Please request a new one." });
+    }
+    if (user.resetOTP !== otp) {
+      return res
+        .status(400)
+        .json({ message: "Incorrect OTP. Please try again." });
+    }
+
+    // mark OTP as verified
+    user.resetOTPVerified = true;
+    await user.save();
+
+    res.json({ message: "OTP verified successfully." });
+  } catch (err) {
+    console.error("Verify OTP error:", err.message);
+    res.status(500).json({ message: "Server error." });
+  }
+};
+
+// ── Reset Password ──────────────────────────────────────────────────
+exports.resetPassword = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ message: "All fields are required." });
+    }
+    if (password.length < 8) {
+      return res
+        .status(400)
+        .json({ message: "Password must be at least 8 characters." });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() }).select(
+      "+password +resetOTP +resetOTPExpires +resetOTPVerified",
+    );
+
+    if (!user) {
+      return res.status(400).json({ message: "User not found." });
+    }
+    if (!user.resetOTPVerified) {
+      return res
+        .status(403)
+        .json({ message: "OTP not verified. Please verify your OTP first." });
+    }
+    if (user.resetOTPExpires < Date.now()) {
+      return res
+        .status(400)
+        .json({ message: "Session expired. Please start again." });
+    }
+
+    // update password + clear OTP fields
+    user.password = await bcrypt.hash(password, 12);
+    user.resetOTP = undefined;
+    user.resetOTPExpires = undefined;
+    user.resetOTPVerified = undefined;
+    await user.save();
+
+    res.json({ message: "Password updated successfully. You can now log in." });
+  } catch (err) {
+    console.error("Reset password error:", err.message);
+    res.status(500).json({ message: "Server error." });
   }
 };
