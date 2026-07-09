@@ -17,6 +17,7 @@ exports.register = async (req, res) => {
       role,
       specialization,
       address,
+      serviceName,
       businessName,
       bio,
     } = req.body;
@@ -50,25 +51,28 @@ exports.register = async (req, res) => {
     // 3. Hash password
     const hashed = await bcrypt.hash(password, 12);
 
-    // 4. Create User
+    // 4. Create User — no name/phone here, those live in Client/ServiceProvider
     const user = await User.create({
-      name,
       email: email.toLowerCase(),
       password: hashed,
-      phone,
       role,
     });
 
-    // 5. Create role-specific profile
+    // 5. Create role-specific profile with name and phone
     if (role === "client") {
       await Client.create({
         user: user._id,
+        name: name.trim(),
+        phone: phone?.trim(),
       });
     }
 
     if (role === "provider") {
       await ServiceProvider.create({
         user: user._id,
+        name: name.trim(),
+        phone: phone?.trim(),
+        serviceName: serviceName?.trim(),
         businessName: businessName || name,
         specialization,
         address,
@@ -88,7 +92,7 @@ exports.register = async (req, res) => {
       token,
       user: {
         id: user._id,
-        name: user.name,
+        name: name.trim(),
         email: user.email,
         role: user.role,
       },
@@ -129,6 +133,18 @@ exports.login = async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password." });
     }
 
+    // Fetch name from the correct profile collection
+    let profileName = "";
+    if (role === "client") {
+      const client = await Client.findOne({ user: user._id }).select("name");
+      profileName = client?.name || "";
+    } else {
+      const provider = await ServiceProvider.findOne({ user: user._id }).select(
+        "name",
+      );
+      profileName = provider?.name || "";
+    }
+
     const token = jwt.sign(
       { userId: user._id, role: user.role },
       process.env.JWT_SECRET,
@@ -139,7 +155,7 @@ exports.login = async (req, res) => {
       token,
       user: {
         id: user._id,
-        name: user.name,
+        name: profileName,
         email: user.email,
         role: user.role,
       },
@@ -149,6 +165,7 @@ exports.login = async (req, res) => {
     res.status(500).json({ message: "Server error during login." });
   }
 };
+
 // ── Send OTP ────────────────────────────────────────────────────────
 exports.sendOTP = async (req, res) => {
   try {
@@ -158,13 +175,12 @@ exports.sendOTP = async (req, res) => {
     }
 
     const user = await User.findOne({ email: email.toLowerCase() });
-    // always return success to prevent user enumeration
     if (!user) {
       return res.status(404).json({
         message: "No account found with this email. Please create an account.",
       });
     }
-    // generate 6-digit OTP
+
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const expires = Date.now() + 10 * 60 * 1000; // 10 minutes
 
@@ -208,7 +224,6 @@ exports.verifyOTP = async (req, res) => {
         .json({ message: "Incorrect OTP. Please try again." });
     }
 
-    // mark OTP as verified
     user.resetOTPVerified = true;
     await user.save();
 
@@ -250,7 +265,6 @@ exports.resetPassword = async (req, res) => {
         .json({ message: "Session expired. Please start again." });
     }
 
-    // update password + clear OTP fields
     user.password = await bcrypt.hash(password, 12);
     user.resetOTP = undefined;
     user.resetOTPExpires = undefined;

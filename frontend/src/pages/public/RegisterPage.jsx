@@ -89,7 +89,7 @@ function LeftPanel() {
       <div>
         <h2
           className="text-3xl font-extrabold mb-3"
-          style={{ fontFamily: "Poppins" }}
+          style={{ fontFamily: "Poppins", color: "white" }}
         >
           Your time, perfectly managed.
         </h2>
@@ -112,7 +112,6 @@ function LeftPanel() {
 export default function RegisterPage() {
   const navigate = useNavigate();
 
-  // ✅ default matches your User.model.js enum: "client" | "provider"
   const [role, setRole] = useState("client");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -130,6 +129,7 @@ export default function RegisterPage() {
   // provider-only fields
   const [specialization, setSpecialization] = useState("");
   const [address, setAddress] = useState("");
+  const [serviceName, setServiceName] = useState("");
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -153,7 +153,7 @@ export default function RegisterPage() {
         gender,
         password,
         role,
-        ...(role === "provider" && { specialization, address }),
+        ...(role === "provider" && { specialization, address, serviceName }),
       };
       const { data } = await axios.post(`${API}/api/auth/register`, payload);
       localStorage.setItem("token", data.token);
@@ -265,6 +265,15 @@ export default function RegisterPage() {
             {/* ── Provider-only fields ── */}
             {role === "provider" && (
               <>
+                <Field
+                  label="Service Name"
+                  id="serviceName"
+                  placeholder="e.g. Dental Checkup, Personal Training"
+                  value={serviceName}
+                  onChange={(e) => setServiceName(e.target.value)}
+                  required
+                />
+
                 <Field
                   label="Specialization"
                   id="specialization"

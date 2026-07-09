@@ -48,7 +48,7 @@ export default function LoginPage() {
       localStorage.setItem("token", data.token);
       localStorage.setItem("role", data.user.role);
       window.location.href =
-        role === "provider" ? "/provider/dashboard" : "/dashboard";
+        role === "provider" ? "/provider/dashboard" : "/client/dashboard";
     } catch (err) {
       setError(err.message || "Something went wrong. Please try again.");
     } finally {
@@ -81,7 +81,7 @@ export default function LoginPage() {
           />
           <h1
             className="text-4xl font-extrabold leading-tight mb-3"
-            style={{ fontFamily: "Poppins" }}
+            style={{ fontFamily: "Poppins", color: "white" }}
           >
             Your time, perfectly managed.
           </h1>
