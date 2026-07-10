@@ -113,10 +113,10 @@ export default function ProviderDashboard() {
   const [stats, setStats] = useState(null);
   const [pendingList, setPendingList] = useState([]);
   const [confirmedToday, setConfirmedToday] = useState([]);
+  const [isProfileComplete, setIsProfileComplete] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // fetch dashboard data
   useEffect(() => {
     async function fetchDashboard() {
       try {
@@ -130,6 +130,7 @@ export default function ProviderDashboard() {
         setStats(data.stats);
         setPendingList(data.pendingRequests);
         setConfirmedToday(data.confirmedToday);
+        setIsProfileComplete(data.isProfileComplete ?? false); // ✅ set here
       } catch (err) {
         setError(err.message);
       } finally {
@@ -150,9 +151,7 @@ export default function ProviderDashboard() {
         body: JSON.stringify({ status: "confirmed" }),
       });
       if (!res.ok) throw new Error("Failed to accept.");
-      // remove from pending list
       setPendingList((p) => p.filter((x) => x.id !== req.id));
-      // update stats
       setStats((s) => ({
         ...s,
         pendingRequests: s.pendingRequests - 1,
@@ -215,11 +214,11 @@ export default function ProviderDashboard() {
   return (
     <ProviderShell title="Dashboard">
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Welcome banner */}
+        {/* ── Welcome banner ── */}
         <div
           className="rounded-2xl p-6 md:p-8 text-white relative overflow-hidden"
           style={{
-            background: "linear-gradient(135deg, #4338ca 0%, #7c3aed 100%)",
+            background: "linear-gradient(135deg, #2563eb 0%, #4338ca 100%)",
           }}
         >
           <div
@@ -249,8 +248,8 @@ export default function ProviderDashboard() {
                 {getGreeting()}, {user.name?.split(" ")[0] || "there"}! 👋
               </h2>
               <p className="text-purple-200 text-sm mb-5">
-                {user.serviceName || "Service Provider"}
-                {user.specialization ? ` · ${user.specialization}` : ""}
+                {user.specialization || user.serviceName || "Service Provider"}
+                {user.address ? ` · ${user.address}` : ""}
               </p>
               <div className="flex flex-wrap gap-3">
                 <button
@@ -282,7 +281,34 @@ export default function ProviderDashboard() {
           </div>
         </div>
 
-        {/* Stat cards */}
+        {/* ── Incomplete profile warning ── */}
+        {!isProfileComplete && (
+          <div
+            onClick={() => navigate("/provider/profile")}
+            className="bg-amber-50 border border-amber-200 rounded-2xl p-4
+                       flex items-center gap-4 cursor-pointer
+                       hover:bg-amber-100 transition-colors"
+          >
+            <div
+              className="w-10 h-10 rounded-xl bg-amber-100 flex items-center
+                            justify-center shrink-0 text-xl"
+            >
+              ⚠️
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-amber-800 text-sm">
+                Complete your profile
+              </p>
+              <p className="text-amber-600 text-xs mt-0.5">
+                Add your bio, service name and location so clients can find and
+                book you.
+              </p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-amber-500 shrink-0" />
+          </div>
+        )}
+
+        {/* ── Stat cards ── */}
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
           <StatCard
             label="Today's Appointments"
@@ -316,7 +342,7 @@ export default function ProviderDashboard() {
           />
         </div>
 
-        {/* Bottom two columns */}
+        {/* ── Bottom two columns ── */}
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Pending requests */}
           <div className="lg:col-span-2">
@@ -328,14 +354,20 @@ export default function ProviderDashboard() {
                 Pending Requests
               </h3>
               {pendingList.length > 0 && (
-                <span className="text-xs font-semibold bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full">
+                <span
+                  className="text-xs font-semibold bg-amber-100 text-amber-700
+                                 px-2.5 py-1 rounded-full"
+                >
                   {pendingList.length} waiting
                 </span>
               )}
             </div>
 
             {pendingList.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-10 text-center">
+              <div
+                className="bg-white rounded-2xl border border-slate-100
+                              shadow-sm p-10 text-center"
+              >
                 <p className="text-2xl mb-2">🎉</p>
                 <p className="font-semibold text-slate-900">All caught up!</p>
                 <p className="text-slate-400 text-sm mt-1">
@@ -368,7 +400,8 @@ export default function ProviderDashboard() {
               </h3>
               <button
                 onClick={() => navigate("/provider/appointments")}
-                className="flex items-center gap-1 text-blue-600 text-sm font-semibold hover:text-blue-700"
+                className="flex items-center gap-1 text-blue-600 text-sm
+                           font-semibold hover:text-blue-700"
               >
                 See all <ChevronRight className="w-4 h-4" />
               </button>

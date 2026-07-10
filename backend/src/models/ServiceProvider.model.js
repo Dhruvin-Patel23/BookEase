@@ -16,6 +16,15 @@ const serviceProviderSchema = new mongoose.Schema(
     bio: { type: String },
     contactEmail: { type: String, lowercase: true, trim: true },
     rating: { type: Number, default: 0 },
+    reviewCount: { type: Number, default: 0 },
+    isAvailable: { type: Boolean, default: true },
+    specializations: [{ type: String }],
+    isProfileComplete: { type: Boolean, default: false },
+    notificationPrefs: {
+      emailReminders: { type: Boolean, default: true },
+      smsReminders: { type: Boolean, default: false },
+      pushNotifications: { type: Boolean, default: true },
+    },
   },
   { timestamps: true },
 );

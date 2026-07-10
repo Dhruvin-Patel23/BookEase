@@ -1,15 +1,17 @@
 const router = require("express").Router();
+const bcrypt = require("bcryptjs");
 const { requireAuth, requireRole } = require("../middleware/auth.middleware");
 const Appointment = require("../models/Appointment.model");
 const ServiceProvider = require("../models/ServiceProvider.model");
+const User = require("../models/User.model");
 
 router.use(requireAuth);
 router.use(requireRole("provider"));
 
-// GET /api/provider/dashboard
+// ── GET /api/provider/dashboard ──────────────────────────────────────
 router.get("/dashboard", async (req, res) => {
   try {
-    const userId = req.auth.userId; // ✅ req.auth not req.user
+    const userId = req.auth.userId;
 
     const provider = await ServiceProvider.findOne({ user: userId });
     if (!provider) {
@@ -66,6 +68,7 @@ router.get("/dashboard", async (req, res) => {
         cancelled,
         averageRating: provider.rating || 0,
       },
+      isProfileComplete: provider.isProfileComplete || false,
       pendingRequests: allPending.map((apt) => ({
         id: apt._id,
         name: apt.user?.name || "Unknown",
@@ -102,7 +105,7 @@ router.get("/dashboard", async (req, res) => {
   }
 });
 
-// PATCH /api/provider/appointments/:id
+// ── PATCH /api/provider/appointments/:id ─────────────────────────────
 router.patch("/appointments/:id", async (req, res) => {
   try {
     const { status } = req.body;
@@ -121,6 +124,130 @@ router.patch("/appointments/:id", async (req, res) => {
 
     res.json({ message: `Appointment ${status}.`, appointment: apt });
   } catch (err) {
+    res.status(500).json({ message: "Server error." });
+  }
+});
+
+// ── GET /api/provider/profile ─────────────────────────────────────────
+router.get("/profile", async (req, res) => {
+  try {
+    const provider = await ServiceProvider.findOne({ user: req.auth.userId });
+    if (!provider) {
+      return res.status(404).json({ message: "Profile not found." });
+    }
+
+    const user = await User.findById(req.auth.userId).select("email");
+
+    res.json({
+      name: provider.name || "",
+      phone: provider.phone || "",
+      serviceName: provider.serviceName || "",
+      specialization: provider.specialization || "",
+      address: provider.address || "",
+      bio: provider.bio || "",
+      contactEmail: provider.contactEmail || "",
+      email: user?.email || "",
+      rating: provider.rating || 0,
+      reviewCount: provider.reviewCount || 0,
+      isAvailable: provider.isAvailable ?? true,
+      specializations: provider.specializations || [],
+      isProfileComplete: provider.isProfileComplete || false,
+      notificationPrefs: provider.notificationPrefs || {
+        emailReminders: true,
+        smsReminders: false,
+        pushNotifications: true,
+      },
+    });
+  } catch (err) {
+    console.error("Get profile error:", err.message);
+    res.status(500).json({ message: "Server error." });
+  }
+});
+
+// ── PUT /api/provider/profile ─────────────────────────────────────────
+router.put("/profile", async (req, res) => {
+  try {
+    const {
+      name,
+      phone,
+      serviceName,
+      address,
+      bio,
+      specializations,
+      isAvailable,
+      notificationPrefs,
+    } = req.body;
+
+    const isProfileComplete = !!(
+      name &&
+      phone &&
+      serviceName &&
+      address &&
+      bio
+    );
+
+    const provider = await ServiceProvider.findOneAndUpdate(
+      { user: req.auth.userId },
+      {
+        name,
+        phone,
+        serviceName,
+        address,
+        bio,
+        specializations: specializations || [],
+        isAvailable: isAvailable ?? true,
+        isProfileComplete,
+        ...(notificationPrefs && { notificationPrefs }),
+      },
+      { new: true },
+    );
+
+    if (!provider) {
+      return res.status(404).json({ message: "Profile not found." });
+    }
+
+    res.json({
+      message: "Profile updated.",
+      isProfileComplete,
+    });
+  } catch (err) {
+    console.error("Update profile error:", err.message);
+    res.status(500).json({ message: "Server error." });
+  }
+});
+
+// ── PUT /api/provider/change-password ────────────────────────────────
+router.put("/change-password", async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: "All fields are required." });
+    }
+    if (newPassword.length < 8) {
+      return res
+        .status(400)
+        .json({ message: "Password must be at least 8 characters." });
+    }
+
+    const user = await User.findById(req.auth.userId).select("+password");
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res
+        .status(401)
+        .json({ message: "Current password is incorrect." });
+    }
+
+    user.password = await bcrypt.hash(newPassword, 12);
+    await user.save();
+
+    res.json({ message: "Password updated successfully." });
+  } catch (err) {
+    console.error("Change password error:", err.message);
     res.status(500).json({ message: "Server error." });
   }
 });
