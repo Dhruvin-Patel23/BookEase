@@ -59,7 +59,7 @@ export default function LoginPage() {
     <div className="min-h-screen grid md:grid-cols-2">
       {/* Left panel */}
       <div
-        className="relative hidden md:flex flex-col justify-between p-12 text-white overflow-hidden"
+        className="relative hidden md:flex flex-col justify-between p-12 text-white overflow-hidden sticky top-0 h-screen"
         style={{
           background: "linear-gradient(160deg, #2563eb 0%, #4338ca 100%)",
         }}

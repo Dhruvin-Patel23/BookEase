@@ -64,7 +64,7 @@ function Field({
 function LeftPanel() {
   return (
     <div
-      className="hidden lg:flex flex-col justify-between p-10 text-white"
+      className="hidden lg:flex flex-col justify-between p-10 text-white sticky top-0 h-screen"
       style={{
         background: "linear-gradient(150deg, #1d4ed8 0%, #4338ca 100%)",
       }}
