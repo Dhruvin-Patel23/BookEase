@@ -123,7 +123,6 @@ exports.login = async (req, res) => {
     if (!user) {
       return res.status(401).json({ message: "Invalid email or password." });
     }
-
     if (user.role !== role) {
       return res.status(401).json({ message: "Invalid email or password." });
     }
@@ -133,16 +132,36 @@ exports.login = async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password." });
     }
 
-    // Fetch name from the correct profile collection
-    let profileName = "";
+    // ── Fetch full profile based on role ──────────────────────────
+    let userResponse = {
+      id: user._id,
+      email: user.email,
+      role: user.role,
+    };
+
     if (role === "client") {
-      const client = await Client.findOne({ user: user._id }).select("name");
-      profileName = client?.name || "";
-    } else {
-      const provider = await ServiceProvider.findOne({ user: user._id }).select(
-        "name",
-      );
-      profileName = provider?.name || "";
+      const client = await Client.findOne({ user: user._id });
+      userResponse = {
+        ...userResponse,
+        name: client?.name || "",
+        phone: client?.phone || "",
+        dateOfBirth: client?.dateOfBirth || null,
+        profileImage: client?.profileImage || null,
+      };
+    }
+
+    if (role === "provider") {
+      const provider = await ServiceProvider.findOne({ user: user._id });
+      userResponse = {
+        ...userResponse,
+        name: provider?.name || "", // ✅ removed name.trim()
+        phone: provider?.phone || "",
+        serviceName: provider?.serviceName || "", // ✅ fixed — was businessName
+        specialization: provider?.specialization || "",
+        address: provider?.address || "",
+        contactEmail: provider?.contactEmail || "",
+        rating: provider?.rating || 0,
+      };
     }
 
     const token = jwt.sign(
@@ -151,15 +170,7 @@ exports.login = async (req, res) => {
       { expiresIn: "7d" },
     );
 
-    res.json({
-      token,
-      user: {
-        id: user._id,
-        name: profileName,
-        email: user.email,
-        role: user.role,
-      },
-    });
+    res.json({ token, user: userResponse });
   } catch (err) {
     console.error("Login error:", err.message);
     res.status(500).json({ message: "Server error during login." });
