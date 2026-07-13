@@ -6,9 +6,12 @@ import SupportPage from "../pages/public/SupportPage";
 import LoginPage from "../pages/public/LoginPage";
 import RegisterPage from "../pages/public/RegisterPage";
 import ForgotPasswordPage from "../pages/public/ForgotPasswordPage";
+
 import ClientDashboard from "../pages/client/Dashboard";
+
 import ProviderDashboard from "../pages/provider/Dashboard";
 import ProviderProfile from "../pages/provider/Profile";
+import AvailabilityManager from "../pages/provider/AvailabilityManager";
 
 export default function AppRoutes() {
   return (
@@ -28,6 +31,10 @@ export default function AppRoutes() {
         {/*provider routes*/}
         <Route path="/provider/dashboard" element={<ProviderDashboard />} />
         <Route path="/provider/profile" element={<ProviderProfile />} />
+        <Route
+          path="/provider/availability"
+          element={<AvailabilityManager />}
+        />
         {/* more routes added as we build each page */}
       </Routes>
     </BrowserRouter>

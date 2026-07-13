@@ -141,8 +141,7 @@ router.get("/profile", async (req, res) => {
     res.json({
       name: provider.name || "",
       phone: provider.phone || "",
-      serviceName: provider.serviceName || "",
-      specialization: provider.specialization || "",
+      profession: provider.profession || "",
       address: provider.address || "",
       bio: provider.bio || "",
       contactEmail: provider.contactEmail || "",
@@ -170,7 +169,7 @@ router.put("/profile", async (req, res) => {
     const {
       name,
       phone,
-      serviceName,
+      profession,
       address,
       bio,
       specializations,
@@ -178,20 +177,14 @@ router.put("/profile", async (req, res) => {
       notificationPrefs,
     } = req.body;
 
-    const isProfileComplete = !!(
-      name &&
-      phone &&
-      serviceName &&
-      address &&
-      bio
-    );
+    const isProfileComplete = !!(name && phone && profession && address && bio);
 
     const provider = await ServiceProvider.findOneAndUpdate(
       { user: req.auth.userId },
       {
         name,
         phone,
-        serviceName,
+        profession,
         address,
         bio,
         specializations: specializations || [],
@@ -206,10 +199,7 @@ router.put("/profile", async (req, res) => {
       return res.status(404).json({ message: "Profile not found." });
     }
 
-    res.json({
-      message: "Profile updated.",
-      isProfileComplete,
-    });
+    res.json({ message: "Profile updated.", isProfileComplete });
   } catch (err) {
     console.error("Update profile error:", err.message);
     res.status(500).json({ message: "Server error." });
@@ -248,6 +238,71 @@ router.put("/change-password", async (req, res) => {
     res.json({ message: "Password updated successfully." });
   } catch (err) {
     console.error("Change password error:", err.message);
+    res.status(500).json({ message: "Server error." });
+  }
+});
+
+// ── GET /api/provider/availability ───────────────────────────────────
+// Returns availability settings + specializations for per-service duration
+router.get("/availability", async (req, res) => {
+  try {
+    const provider = await ServiceProvider.findOne({ user: req.auth.userId });
+    if (!provider) {
+      return res.status(404).json({ message: "Provider not found." });
+    }
+
+    res.json({
+      weeklySchedule: provider.availability?.weeklySchedule || {},
+      defaultDuration: provider.availability?.defaultDuration || 30,
+      bufferTime: provider.availability?.bufferTime || "None",
+      blockedPeriods: provider.availability?.blockedPeriods || [],
+      // per-service durations keyed by specialization name
+      // e.g. { "Dental Consultation": 15, "Dental Cleaning": 30 }
+      serviceDurations: provider.availability?.serviceDurations || {},
+      // list of specializations so frontend can render the per-service rows
+      specializations: provider.specializations || [],
+    });
+  } catch (err) {
+    console.error("Get availability error:", err.message);
+    res.status(500).json({ message: "Server error." });
+  }
+});
+
+// ── PUT /api/provider/availability ───────────────────────────────────
+router.put("/availability", async (req, res) => {
+  try {
+    const {
+      weeklySchedule,
+      defaultDuration,
+      bufferTime,
+      blockedPeriods,
+      serviceDurations, // { "Dental Consultation": 15, "Fitness Training": 60 }
+    } = req.body;
+
+    const provider = await ServiceProvider.findOneAndUpdate(
+      { user: req.auth.userId },
+      {
+        availability: {
+          weeklySchedule: weeklySchedule || {},
+          defaultDuration: defaultDuration || 30,
+          bufferTime: bufferTime || "None",
+          blockedPeriods: blockedPeriods || [],
+          serviceDurations: serviceDurations || {},
+        },
+      },
+      { new: true },
+    );
+
+    if (!provider) {
+      return res.status(404).json({ message: "Provider not found." });
+    }
+
+    res.json({
+      message: "Availability saved.",
+      availability: provider.availability,
+    });
+  } catch (err) {
+    console.error("Update availability error:", err.message);
     res.status(500).json({ message: "Server error." });
   }
 });

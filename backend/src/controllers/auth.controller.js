@@ -15,9 +15,8 @@ exports.register = async (req, res) => {
       phone,
       password,
       role,
-      specialization,
       address,
-      serviceName,
+      profession,
       businessName,
       bio,
     } = req.body;
@@ -34,9 +33,9 @@ exports.register = async (req, res) => {
         .status(400)
         .json({ message: "Password must be at least 8 characters." });
     }
-    if (role === "provider" && (!specialization || !address)) {
+    if (role === "provider" && !address) {
       return res.status(400).json({
-        message: "Specialization and address are required for providers.",
+        message: "Address is required for providers.",
       });
     }
 
@@ -51,14 +50,14 @@ exports.register = async (req, res) => {
     // 3. Hash password
     const hashed = await bcrypt.hash(password, 12);
 
-    // 4. Create User — no name/phone here, those live in Client/ServiceProvider
+    // 4. Create User
     const user = await User.create({
       email: email.toLowerCase(),
       password: hashed,
       role,
     });
 
-    // 5. Create role-specific profile with name and phone
+    // 5. Create role-specific profile
     if (role === "client") {
       await Client.create({
         user: user._id,
@@ -72,9 +71,8 @@ exports.register = async (req, res) => {
         user: user._id,
         name: name.trim(),
         phone: phone?.trim(),
-        serviceName: serviceName?.trim(),
+        profession: profession?.trim(),
         businessName: businessName || name,
-        specialization,
         address,
         bio: bio || "",
         contactEmail: email.toLowerCase(),
@@ -154,10 +152,9 @@ exports.login = async (req, res) => {
       const provider = await ServiceProvider.findOne({ user: user._id });
       userResponse = {
         ...userResponse,
-        name: provider?.name || "", // ✅ removed name.trim()
+        name: provider?.name || "",
         phone: provider?.phone || "",
-        serviceName: provider?.serviceName || "", // ✅ fixed — was businessName
-        specialization: provider?.specialization || "",
+        profession: provider?.profession || "",
         address: provider?.address || "",
         contactEmail: provider?.contactEmail || "",
         rating: provider?.rating || 0,

@@ -127,9 +127,8 @@ export default function RegisterPage() {
   const [confirm, setConfirm] = useState("");
 
   // provider-only fields
-  const [specialization, setSpecialization] = useState("");
+  const [profession, setProfession] = useState("");
   const [address, setAddress] = useState("");
-  const [serviceName, setServiceName] = useState("");
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -153,7 +152,7 @@ export default function RegisterPage() {
         gender,
         password,
         role,
-        ...(role === "provider" && { specialization, address, serviceName }),
+        ...(role === "provider" && { profession, address }),
       };
       const { data } = await axios.post(`${API}/api/auth/register`, payload);
       localStorage.setItem("token", data.token);
@@ -266,20 +265,11 @@ export default function RegisterPage() {
             {role === "provider" && (
               <>
                 <Field
-                  label="Service Name"
-                  id="serviceName"
-                  placeholder="e.g. Dental Checkup, Personal Training"
-                  value={serviceName}
-                  onChange={(e) => setServiceName(e.target.value)}
-                  required
-                />
-
-                <Field
-                  label="Specialization"
-                  id="specialization"
-                  placeholder="e.g. Dental Care, Fitness, Medical"
-                  value={specialization}
-                  onChange={(e) => setSpecialization(e.target.value)}
+                  label="Profession"
+                  id="profession"
+                  placeholder="e.g. Personal Trainer, Dentist"
+                  value={profession}
+                  onChange={(e) => setProfession(e.target.value)}
                   required
                 />
 

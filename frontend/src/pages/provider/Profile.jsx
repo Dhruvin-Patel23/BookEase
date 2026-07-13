@@ -50,7 +50,7 @@ export default function ProviderProfile() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState(user.email || "");
   const [phone, setPhone] = useState("");
-  const [serviceName, setServiceName] = useState("");
+  const [profession, setProfession] = useState("");
   const [address, setAddress] = useState("");
   const [bio, setBio] = useState("");
   const [isAvailable, setIsAvailable] = useState(true);
@@ -70,7 +70,6 @@ export default function ProviderProfile() {
     smsReminders: false,
     pushNotifications: true,
   });
-  // tracks which pref key is currently saving
   const [savingPref, setSavingPref] = useState(null);
   const [prefsMsg, setPrefsMsg] = useState({ type: "", text: "" });
 
@@ -95,7 +94,7 @@ export default function ProviderProfile() {
 
         setName(data.name || "");
         setPhone(data.phone || "");
-        setServiceName(data.serviceName || data.specialization || "");
+        setProfession(data.profession || "");
         setAddress(data.address || "");
         setBio(data.bio || "");
         setIsAvailable(data.isAvailable ?? true);
@@ -128,7 +127,7 @@ export default function ProviderProfile() {
         body: JSON.stringify({
           name,
           phone,
-          serviceName,
+          profession,
           address,
           bio,
           isAvailable,
@@ -141,7 +140,7 @@ export default function ProviderProfile() {
       const stored = JSON.parse(localStorage.getItem("user") || "{}");
       localStorage.setItem(
         "user",
-        JSON.stringify({ ...stored, name, serviceName, address }),
+        JSON.stringify({ ...stored, name, profession, address }),
       );
 
       setProfileMsg({ type: "success", text: "Profile updated successfully!" });
@@ -207,7 +206,7 @@ export default function ProviderProfile() {
         body: JSON.stringify({
           name,
           phone,
-          serviceName,
+          profession,
           address,
           bio,
           isAvailable: value,
@@ -230,7 +229,7 @@ export default function ProviderProfile() {
   // ── live toggle: update one pref key instantly ─────────────────────
   async function handleTogglePref(key, value) {
     const updated = { ...prefs, [key]: value };
-    setPrefs(updated); // optimistic UI update
+    setPrefs(updated);
     setSavingPref(key);
     setPrefsMsg({ type: "", text: "" });
     try {
@@ -243,7 +242,7 @@ export default function ProviderProfile() {
         body: JSON.stringify({
           name,
           phone,
-          serviceName,
+          profession,
           address,
           bio,
           isAvailable,
@@ -253,9 +252,7 @@ export default function ProviderProfile() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
-      // success — no banner needed, the toggle itself is the feedback
     } catch (err) {
-      // revert optimistic update on failure
       setPrefs(prefs);
       setPrefsMsg({ type: "error", text: `Failed to update: ${err.message}` });
     } finally {
@@ -328,7 +325,7 @@ export default function ProviderProfile() {
                 {name || "Your Name"}
               </h3>
               <p className="text-slate-500 text-sm">
-                {serviceName || "Service Provider"}
+                {profession || "Service Provider"}
               </p>
               <div className="flex items-center gap-3 mt-1 flex-wrap">
                 {rating > 0 && (
@@ -385,12 +382,12 @@ export default function ProviderProfile() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Service Name">
+              <Field label="Profession">
                 <input
                   className={INPUT}
-                  value={serviceName}
-                  onChange={(e) => setServiceName(e.target.value)}
-                  placeholder="Personal Trainer"
+                  value={profession}
+                  onChange={(e) => setProfession(e.target.value)}
+                  placeholder="e.g. Personal Trainer, Dentist"
                 />
               </Field>
               <Field label="Location">

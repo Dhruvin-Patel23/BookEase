@@ -10,20 +10,37 @@ const serviceProviderSchema = new mongoose.Schema(
     },
     name: { type: String, required: true, trim: true },
     phone: { type: String, trim: true },
-    serviceName: { type: String, trim: true },
-    specialization: { type: String, trim: true },
+    businessName: { type: String, trim: true },
+    profession: { type: String, trim: true }, // was serviceName
+    specializations: [{ type: String, trim: true }], // array only, specialization removed
     address: { type: String, trim: true },
     bio: { type: String },
     contactEmail: { type: String, lowercase: true, trim: true },
+    profileImage: { type: String },
     rating: { type: Number, default: 0 },
     reviewCount: { type: Number, default: 0 },
     isAvailable: { type: Boolean, default: true },
-    specializations: [{ type: String }],
     isProfileComplete: { type: Boolean, default: false },
+
     notificationPrefs: {
       emailReminders: { type: Boolean, default: true },
       smsReminders: { type: Boolean, default: false },
       pushNotifications: { type: Boolean, default: true },
+    },
+
+    availability: {
+      weeklySchedule: { type: mongoose.Schema.Types.Mixed, default: {} },
+      defaultDuration: { type: Number, default: 30 },
+      bufferTime: { type: String, default: "None" },
+      blockedPeriods: [
+        {
+          title: { type: String },
+          startDate: { type: String },
+          endDate: { type: String },
+          type: { type: String },
+        },
+      ],
+      serviceDurations: { type: mongoose.Schema.Types.Mixed, default: {} },
     },
   },
   { timestamps: true },
