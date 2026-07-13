@@ -46,7 +46,7 @@ export default function LoginPage() {
       if (!res.ok) throw new Error(data.message || "Login failed");
 
       localStorage.setItem("token", data.token);
-      localStorage.setItem("role", data.user.role);
+      localStorage.setItem("user", JSON.stringify(data.user)); // ✅ save full user
       window.location.href =
         role === "provider" ? "/provider/dashboard" : "/client/dashboard";
     } catch (err) {

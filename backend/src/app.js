@@ -18,5 +18,6 @@ app.use(
 );
 // routes will be mounted here as we build each page
 app.use("/api/auth", require("./routes/auth.routes"));
+app.use("/api/provider", require("./routes/provider.routes"));
 
 module.exports = app;

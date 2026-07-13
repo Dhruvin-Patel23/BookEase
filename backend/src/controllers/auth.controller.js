@@ -15,9 +15,8 @@ exports.register = async (req, res) => {
       phone,
       password,
       role,
-      specialization,
       address,
-      serviceName,
+      profession,
       businessName,
       bio,
     } = req.body;
@@ -34,9 +33,9 @@ exports.register = async (req, res) => {
         .status(400)
         .json({ message: "Password must be at least 8 characters." });
     }
-    if (role === "provider" && (!specialization || !address)) {
+    if (role === "provider" && !address) {
       return res.status(400).json({
-        message: "Specialization and address are required for providers.",
+        message: "Address is required for providers.",
       });
     }
 
@@ -51,14 +50,14 @@ exports.register = async (req, res) => {
     // 3. Hash password
     const hashed = await bcrypt.hash(password, 12);
 
-    // 4. Create User — no name/phone here, those live in Client/ServiceProvider
+    // 4. Create User
     const user = await User.create({
       email: email.toLowerCase(),
       password: hashed,
       role,
     });
 
-    // 5. Create role-specific profile with name and phone
+    // 5. Create role-specific profile
     if (role === "client") {
       await Client.create({
         user: user._id,
@@ -72,9 +71,8 @@ exports.register = async (req, res) => {
         user: user._id,
         name: name.trim(),
         phone: phone?.trim(),
-        serviceName: serviceName?.trim(),
+        profession: profession?.trim(),
         businessName: businessName || name,
-        specialization,
         address,
         bio: bio || "",
         contactEmail: email.toLowerCase(),
@@ -123,7 +121,6 @@ exports.login = async (req, res) => {
     if (!user) {
       return res.status(401).json({ message: "Invalid email or password." });
     }
-
     if (user.role !== role) {
       return res.status(401).json({ message: "Invalid email or password." });
     }
@@ -133,16 +130,35 @@ exports.login = async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password." });
     }
 
-    // Fetch name from the correct profile collection
-    let profileName = "";
+    // ── Fetch full profile based on role ──────────────────────────
+    let userResponse = {
+      id: user._id,
+      email: user.email,
+      role: user.role,
+    };
+
     if (role === "client") {
-      const client = await Client.findOne({ user: user._id }).select("name");
-      profileName = client?.name || "";
-    } else {
-      const provider = await ServiceProvider.findOne({ user: user._id }).select(
-        "name",
-      );
-      profileName = provider?.name || "";
+      const client = await Client.findOne({ user: user._id });
+      userResponse = {
+        ...userResponse,
+        name: client?.name || "",
+        phone: client?.phone || "",
+        dateOfBirth: client?.dateOfBirth || null,
+        profileImage: client?.profileImage || null,
+      };
+    }
+
+    if (role === "provider") {
+      const provider = await ServiceProvider.findOne({ user: user._id });
+      userResponse = {
+        ...userResponse,
+        name: provider?.name || "",
+        phone: provider?.phone || "",
+        profession: provider?.profession || "",
+        address: provider?.address || "",
+        contactEmail: provider?.contactEmail || "",
+        rating: provider?.rating || 0,
+      };
     }
 
     const token = jwt.sign(
@@ -151,15 +167,7 @@ exports.login = async (req, res) => {
       { expiresIn: "7d" },
     );
 
-    res.json({
-      token,
-      user: {
-        id: user._id,
-        name: profileName,
-        email: user.email,
-        role: user.role,
-      },
-    });
+    res.json({ token, user: userResponse });
   } catch (err) {
     console.error("Login error:", err.message);
     res.status(500).json({ message: "Server error during login." });
