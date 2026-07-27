@@ -8,6 +8,7 @@ import RegisterPage from "../pages/public/RegisterPage";
 import ForgotPasswordPage from "../pages/public/ForgotPasswordPage";
 
 import ClientDashboard from "../pages/client/Dashboard";
+import BookAppointment from "../pages/client/BookAppointment";
 
 import ProviderDashboard from "../pages/provider/Dashboard";
 import ProviderProfile from "../pages/provider/Profile";
@@ -27,6 +28,7 @@ export default function AppRoutes() {
 
         {/*client routes*/}
         <Route path="/client/dashboard" element={<ClientDashboard />} />
+        <Route path="/client/book" element={<BookAppointment />} />
 
         {/*provider routes*/}
         <Route path="/provider/dashboard" element={<ProviderDashboard />} />
