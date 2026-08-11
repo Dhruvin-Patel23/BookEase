@@ -156,7 +156,7 @@ function DayEditor({ day, schedule, onSave, onClose }) {
   );
 }
 
-// ── Add Blocked Period modal ──────────────────────────────────────────
+// ── Add Blocked Period modal ───────────────────────────────────────────
 function AddBlockModal({ onSave, onClose }) {
   const [title, setTitle] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -274,20 +274,24 @@ export default function AvailabilityManager() {
       {},
     ),
   );
+
+  // ── Duration state ────────────────────────────────────────────────
   const [defaultDuration, setDefaultDuration] = useState(30);
+  const [customDurationActive, setCustomDurationActive] = useState(false);
+  const [customDuration, setCustomDuration] = useState("");
+
+  // ── Buffer state ──────────────────────────────────────────────────
   const [bufferTime, setBufferTime] = useState("None");
   const [customBuffer, setCustomBuffer] = useState("");
-  const [blockedPeriods, setBlockedPeriods] = useState([]);
-  const [specializations, setSpecializations] = useState([]);
-  const [serviceDurations, setServiceDurations] = useState({});
 
+  const [blockedPeriods, setBlockedPeriods] = useState([]);
   const [editingDay, setEditingDay] = useState(null);
   const [showAddBlock, setShowAddBlock] = useState(false);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState({ type: "", text: "" });
   const [fetching, setFetching] = useState(true);
 
-  // ── fetch ────────────────────────────────────────────────────────
+  // ── fetch ─────────────────────────────────────────────────────────
   useEffect(() => {
     async function load() {
       try {
@@ -299,20 +303,32 @@ export default function AvailabilityManager() {
 
         if (data.weeklySchedule && Object.keys(data.weeklySchedule).length > 0)
           setWeeklySchedule(data.weeklySchedule);
-        if (data.defaultDuration) setDefaultDuration(data.defaultDuration);
+
+        // Load duration — detect custom
+        if (data.defaultDuration) {
+          const savedDur = data.defaultDuration;
+          if (DURATIONS.includes(savedDur)) {
+            setDefaultDuration(savedDur);
+            setCustomDurationActive(false);
+          } else {
+            setDefaultDuration(savedDur);
+            setCustomDurationActive(true);
+            setCustomDuration(String(savedDur));
+          }
+        }
+
+        // Load buffer — detect custom
         if (data.bufferTime) {
-          // If the saved value isn't one of the preset options, it's a custom value
-          if (BUFFERS.slice(0, -1).includes(data.bufferTime)) {
+          const presets = BUFFERS.slice(0, -1); // exclude "Custom"
+          if (presets.includes(data.bufferTime)) {
             setBufferTime(data.bufferTime);
           } else if (data.bufferTime !== "None") {
             setBufferTime("Custom");
-            // Strip " min" suffix if present for the input field
             setCustomBuffer(data.bufferTime.replace(" min", ""));
           }
         }
+
         if (data.blockedPeriods) setBlockedPeriods(data.blockedPeriods);
-        if (data.specializations) setSpecializations(data.specializations);
-        if (data.serviceDurations) setServiceDurations(data.serviceDurations);
       } catch (err) {
         console.error("Load availability error:", err.message);
       } finally {
@@ -322,7 +338,7 @@ export default function AvailabilityManager() {
     load();
   }, []);
 
-  // ── helpers ──────────────────────────────────────────────────────
+  // ── helpers ───────────────────────────────────────────────────────
   function toggleDay(day) {
     setWeeklySchedule((s) => ({
       ...s,
@@ -335,19 +351,25 @@ export default function AvailabilityManager() {
     setEditingDay(null);
   }
 
-  function setServiceDuration(spec, duration) {
-    setServiceDurations((prev) => ({ ...prev, [spec]: Number(duration) }));
+  function handleDurationPreset(d) {
+    setDefaultDuration(d);
+    setCustomDurationActive(false);
+    setCustomDuration("");
   }
 
-  // Resolve the actual buffer value to save
+  function handleCustomDurationChange(val) {
+    setCustomDuration(val);
+    const num = parseInt(val, 10);
+    if (num > 0) setDefaultDuration(num);
+  }
+
   function resolvedBufferTime() {
     if (bufferTime !== "Custom") return bufferTime;
     const val = parseInt(customBuffer, 10);
-    if (!val || val <= 0) return "None";
-    return `${val} min`;
+    return val > 0 ? `${val} min` : "None";
   }
 
-  // ── save ─────────────────────────────────────────────────────────
+  // ── save ──────────────────────────────────────────────────────────
   async function handleSave() {
     setSaving(true);
     setMsg({ type: "", text: "" });
@@ -363,7 +385,6 @@ export default function AvailabilityManager() {
           defaultDuration,
           bufferTime: resolvedBufferTime(),
           blockedPeriods,
-          serviceDurations,
         }),
       });
       const data = await res.json();
@@ -472,13 +493,14 @@ export default function AvailabilityManager() {
           <p className="text-sm text-slate-400 mb-5">
             Set the default session length for all bookings.
           </p>
+
           <div className="flex flex-wrap gap-2">
             {DURATIONS.map((d) => (
               <button
                 key={d}
-                onClick={() => setDefaultDuration(d)}
+                onClick={() => handleDurationPreset(d)}
                 className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
-                  defaultDuration === d
+                  defaultDuration === d && !customDurationActive
                     ? "bg-blue-600 text-white"
                     : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                 }`}
@@ -486,57 +508,60 @@ export default function AvailabilityManager() {
                 {d} min
               </button>
             ))}
+            <button
+              onClick={() => setCustomDurationActive((v) => !v)}
+              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
+                customDurationActive
+                  ? "bg-blue-600 text-white"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              Custom
+            </button>
           </div>
 
-          {specializations.length > 0 && (
-            <div className="mt-6">
-              <p className="text-sm font-semibold text-slate-700 mb-1">
-                Per-Specialization Duration
-              </p>
-              <p className="text-xs text-slate-400 mb-4">
-                Override the default duration for specific specializations.
-                Falls back to default if not set.
-              </p>
-              <div className="space-y-2">
-                {specializations.map((spec) => (
-                  <div
-                    key={spec}
-                    className="flex items-center justify-between px-4 py-3 rounded-xl
-                               bg-slate-50 border border-slate-100"
-                  >
-                    <span className="text-sm text-slate-700 font-medium">
-                      {spec}
-                    </span>
-                    <select
-                      value={serviceDurations[spec] || defaultDuration}
-                      onChange={(e) => setServiceDuration(spec, e.target.value)}
-                      className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm
-                                 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
-                    >
-                      {DURATIONS.map((d) => (
-                        <option key={d} value={d}>
-                          {d} min
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                ))}
+          {/* Custom duration input */}
+          {customDurationActive && (
+            <div className="mt-4 flex items-center gap-3">
+              <div className="relative w-36">
+                <input
+                  type="number"
+                  min={5}
+                  max={480}
+                  value={customDuration}
+                  onChange={(e) => handleCustomDurationChange(e.target.value)}
+                  placeholder="e.g. 75"
+                  className="w-full px-4 py-2.5 pr-14 rounded-xl border border-blue-300
+                             bg-blue-50 text-slate-900 text-sm font-medium
+                             focus:outline-none focus:ring-2 focus:ring-blue-400
+                             placeholder-slate-400"
+                />
+                <span
+                  className="absolute right-3 top-1/2 -translate-y-1/2
+                                 text-xs font-semibold text-slate-400 pointer-events-none"
+                >
+                  min
+                </span>
               </div>
+              {customDuration && parseInt(customDuration, 10) > 0 && (
+                <span className="text-sm text-slate-500">
+                  {Math.floor(parseInt(customDuration, 10) / 60) > 0
+                    ? `${Math.floor(parseInt(customDuration, 10) / 60)}h `
+                    : ""}
+                  {parseInt(customDuration, 10) % 60 > 0
+                    ? `${parseInt(customDuration, 10) % 60} min`
+                    : ""}
+                </span>
+              )}
             </div>
           )}
 
-          {specializations.length === 0 && (
-            <p className="text-xs text-slate-400 mt-4">
-              Add specializations in your{" "}
-              <a
-                href="/provider/profile"
-                className="text-blue-500 hover:underline"
-              >
-                Profile
-              </a>{" "}
-              to set per-specialization durations.
-            </p>
-          )}
+          <p className="text-xs text-slate-400 mt-3">
+            Active:{" "}
+            <span className="font-semibold text-slate-600">
+              {defaultDuration} min
+            </span>
+          </p>
         </div>
 
         {/* ── Buffer Time ── */}
@@ -545,6 +570,7 @@ export default function AvailabilityManager() {
           <p className="text-sm text-slate-400 mb-5">
             A gap between appointments to give you time to prepare.
           </p>
+
           <div className="flex flex-wrap gap-2">
             {BUFFERS.map((b) => (
               <button
@@ -564,14 +590,14 @@ export default function AvailabilityManager() {
             ))}
           </div>
 
-          {/* Custom buffer input — revealed when "Custom" is selected */}
+          {/* Custom buffer input */}
           {bufferTime === "Custom" && (
             <div className="mt-4 flex items-center gap-3">
               <div className="relative w-36">
                 <input
                   type="number"
-                  min="1"
-                  max="120"
+                  min={1}
+                  max={120}
                   value={customBuffer}
                   onChange={(e) => setCustomBuffer(e.target.value)}
                   placeholder="e.g. 20"
@@ -580,7 +606,10 @@ export default function AvailabilityManager() {
                              focus:outline-none focus:ring-2 focus:ring-blue-400
                              placeholder-slate-400"
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400 pointer-events-none">
+                <span
+                  className="absolute right-3 top-1/2 -translate-y-1/2
+                                 text-xs font-semibold text-slate-400 pointer-events-none"
+                >
                   min
                 </span>
               </div>
@@ -592,7 +621,6 @@ export default function AvailabilityManager() {
             </div>
           )}
 
-          {/* Active buffer summary */}
           <p className="text-xs text-slate-400 mt-3">
             Active:{" "}
             <span className="font-semibold text-slate-600">
@@ -620,6 +648,7 @@ export default function AvailabilityManager() {
             Block vacation, holidays, or leave. Clients won't see slots on these
             dates.
           </p>
+
           {blockedPeriods.length === 0 ? (
             <p className="text-sm text-slate-400 text-center py-6">
               No blocked periods added

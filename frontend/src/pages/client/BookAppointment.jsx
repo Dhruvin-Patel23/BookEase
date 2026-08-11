@@ -47,13 +47,7 @@ const DAY_NAMES_FULL = [
 
 // ── Step indicator ────────────────────────────────────────────────────
 function Stepper({ step }) {
-  const steps = [
-    "Select Service",
-    "Choose Provider",
-    "Select Service",
-    "Pick Time",
-    "Confirm",
-  ];
+  const steps = ["Select Service", "Choose Provider", "Pick Time", "Confirm"];
   return (
     <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-2">
       {steps.map((s, i) => {
@@ -125,6 +119,7 @@ function ChooseProvider({ service, onSelect, onBack }) {
   const token = localStorage.getItem("token");
   const [providers, setProviders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState(null); // which provider is expanded
 
   useEffect(() => {
     async function fetchProviders() {
@@ -144,6 +139,25 @@ function ChooseProvider({ service, onSelect, onBack }) {
     fetchProviders();
   }, [service]);
 
+  // get which days provider is available
+  function getAvailableDays(provider) {
+    const schedule = provider.availability?.weeklySchedule;
+    if (!schedule) return [];
+    const days = [
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Saturday",
+      "Sunday",
+    ];
+    return days.filter((day) => {
+      const d = schedule[day] || (schedule.get && schedule.get(day));
+      return d?.enabled;
+    });
+  }
+
   return (
     <div>
       <h2
@@ -155,7 +169,10 @@ function ChooseProvider({ service, onSelect, onBack }) {
 
       {loading ? (
         <div className="flex justify-center py-12">
-          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          <div
+            className="w-8 h-8 border-4 border-blue-600 border-t-transparent
+                          rounded-full animate-spin"
+          />
         </div>
       ) : providers.length === 0 ? (
         <div className="text-center py-12">
@@ -173,115 +190,189 @@ function ChooseProvider({ service, onSelect, onBack }) {
               .map((n) => n[0])
               .join("")
               .toUpperCase();
+            const isExpanded = expandedId === p._id;
+            const availDays = getAvailableDays(p);
+            const DAY_SHORT = {
+              Monday: "Mon",
+              Tuesday: "Tue",
+              Wednesday: "Wed",
+              Thursday: "Thu",
+              Friday: "Fri",
+              Saturday: "Sat",
+              Sunday: "Sun",
+            };
+
             return (
-              <button
+              <div
                 key={p._id}
-                onClick={() => onSelect(p)}
-                className="w-full bg-white rounded-2xl border border-slate-100 shadow-sm
-                           p-5 flex items-center gap-4 hover:border-blue-300
-                           hover:shadow-md transition-all text-left"
+                className={`bg-white rounded-2xl border transition-all shadow-sm
+                  ${isExpanded ? "border-blue-300 shadow-md" : "border-slate-100"}`}
               >
-                <div
-                  className="w-14 h-14 rounded-full bg-purple-100 flex items-center
-                                justify-center shrink-0 text-xl font-bold text-purple-700"
+                {/* ── Provider row — always visible ── */}
+                <button
+                  onClick={() => setExpandedId(isExpanded ? null : p._id)}
+                  className="w-full p-5 flex items-center gap-4 text-left"
                 >
-                  {initials}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold text-slate-900">{p.name}</span>
-                    <span
-                      className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                        p.isAvailable
-                          ? "bg-green-100 text-green-700"
-                          : "bg-slate-100 text-slate-500"
-                      }`}
-                    >
-                      {p.isAvailable ? "Available" : "Busy"}
-                    </span>
+                  {/* Avatar */}
+                  <div
+                    className="w-14 h-14 rounded-full bg-purple-100 flex items-center
+                                  justify-center shrink-0 text-xl font-bold text-purple-700"
+                  >
+                    {initials}
                   </div>
-                  <p className="text-slate-400 text-sm mt-0.5">
-                    {p.specializations?.join(", ") ||
-                      p.profession ||
-                      "Service Provider"}
-                    {p.address ? ` · 📍 ${p.address}` : ""}
-                  </p>
-                  {p.rating > 0 && (
-                    <span className="flex items-center gap-1 text-sm text-amber-500 font-semibold mt-1">
-                      <Star className="w-3.5 h-3.5 fill-amber-400" />
-                      {p.rating.toFixed(1)}
-                      <span className="text-slate-400 font-normal">
-                        ({p.reviewCount})
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-slate-900">{p.name}</span>
+                      <span
+                        className={`text-xs font-semibold px-2 py-0.5 rounded-full
+                        ${
+                          p.isAvailable
+                            ? "bg-green-100 text-green-700"
+                            : "bg-slate-100 text-slate-500"
+                        }`}
+                      >
+                        {p.isAvailable ? "Available" : "Busy"}
                       </span>
-                    </span>
-                  )}
-                </div>
-                <ChevronRight className="w-5 h-5 text-slate-300 shrink-0" />
-              </button>
-            );
-          })}
-        </div>
-      )}
+                    </div>
+                    <p className="text-slate-400 text-sm mt-0.5 truncate">
+                      {p.specializations?.slice(0, 2).join(", ") ||
+                        p.profession ||
+                        "Service Provider"}
+                      {p.address ? ` · 📍 ${p.address}` : ""}
+                    </p>
+                    {p.rating > 0 && (
+                      <span
+                        className="flex items-center gap-1 text-sm text-amber-500
+                                       font-semibold mt-1"
+                      >
+                        <Star className="w-3.5 h-3.5 fill-amber-400" />
+                        {p.rating.toFixed(1)}
+                        <span className="text-slate-400 font-normal">
+                          ({p.reviewCount})
+                        </span>
+                      </span>
+                    )}
+                  </div>
 
-      <button
-        onClick={onBack}
-        className="mt-6 text-sm text-slate-500 hover:text-slate-700 flex items-center gap-1"
-      >
-        <ChevronLeft className="w-4 h-4" /> Back
-      </button>
-    </div>
-  );
-}
+                  {/* Expand arrow */}
+                  <ChevronRight
+                    className={`w-5 h-5 text-slate-300 shrink-0 transition-transform
+                                            ${isExpanded ? "rotate-90" : ""}`}
+                  />
+                </button>
 
-// ── Step 2.5 — Select Specific Specialization from Provider ──────────
-function SelectSpecialization({ provider, onSelect, onBack }) {
-  const specializations = provider.specializations || [];
+                {/* ── Expanded detail panel ── */}
+                {isExpanded && (
+                  <div className="px-5 pb-5 border-t border-slate-100 pt-4">
+                    {/* Bio */}
+                    {p.bio && (
+                      <div className="mb-4">
+                        <p
+                          className="text-xs font-semibold text-slate-500 uppercase
+                                      tracking-wide mb-1.5"
+                        >
+                          About
+                        </p>
+                        <p className="text-slate-600 text-sm leading-relaxed">
+                          {p.bio}
+                        </p>
+                      </div>
+                    )}
 
-  return (
-    <div>
-      <h2
-        className="text-xl font-bold text-slate-900 mb-2"
-        style={{ fontFamily: "Poppins" }}
-      >
-        Select a service
-      </h2>
-      <p className="text-slate-400 text-sm mb-6">
-        Choose the specific service you need from{" "}
-        <span className="font-semibold text-slate-700">{provider.name}</span>
-      </p>
+                    {/* Specializations */}
+                    {p.specializations?.length > 0 && (
+                      <div className="mb-4">
+                        <p
+                          className="text-xs font-semibold text-slate-500 uppercase
+                                      tracking-wide mb-2"
+                        >
+                          Specializations
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {p.specializations.map((tag) => (
+                            <span
+                              key={tag}
+                              className="text-xs font-semibold bg-blue-50 text-blue-700
+                                         px-3 py-1.5 rounded-full border border-blue-100"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
-      {specializations.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-2xl mb-2">⚠️</p>
-          <p className="font-semibold text-slate-900">No services listed</p>
-          <p className="text-slate-400 text-sm mt-1">
-            This provider hasn't added their specializations yet.
-          </p>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {specializations.map((spec) => {
-            // show duration override if available
-            const durations = provider.availability?.serviceDurations || {};
-            const defaultDur = provider.availability?.defaultDuration || 30;
-            const duration = durations[spec] || defaultDur;
+                    {/* Available days */}
+                    {availDays.length > 0 && (
+                      <div className="mb-5">
+                        <p
+                          className="text-xs font-semibold text-slate-500 uppercase
+                                      tracking-wide mb-2"
+                        >
+                          Available Days
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {[
+                            "Monday",
+                            "Tuesday",
+                            "Wednesday",
+                            "Thursday",
+                            "Friday",
+                            "Saturday",
+                            "Sunday",
+                          ].map((day) => {
+                            const isOn = availDays.includes(day);
+                            return (
+                              <span
+                                key={day}
+                                className={`text-xs font-semibold px-3 py-1.5 rounded-full
+                                  ${
+                                    isOn
+                                      ? "bg-green-50 text-green-700 border border-green-100"
+                                      : "bg-slate-50 text-slate-300 border border-slate-100"
+                                  }`}
+                              >
+                                {DAY_SHORT[day]}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
 
-            return (
-              <button
-                key={spec}
-                onClick={() => onSelect(spec)}
-                className="w-full bg-white rounded-2xl border border-slate-100 shadow-sm
-                           p-5 flex items-center justify-between hover:border-blue-300
-                           hover:shadow-md transition-all text-left"
-              >
-                <div>
-                  <p className="font-semibold text-slate-900">{spec}</p>
-                  <p className="text-slate-400 text-xs mt-0.5">
-                    Session duration: {duration} min
-                  </p>
-                </div>
-                <ChevronRight className="w-5 h-5 text-slate-300 shrink-0" />
-              </button>
+                    {/* Rating summary */}
+                    {p.rating > 0 && (
+                      <div
+                        className="flex items-center gap-3 mb-5 bg-amber-50
+                                      rounded-xl px-4 py-3 border border-amber-100"
+                      >
+                        <Star className="w-5 h-5 fill-amber-400 text-amber-400 shrink-0" />
+                        <div>
+                          <p className="font-bold text-slate-900 text-sm">
+                            {p.rating.toFixed(1)} out of 5
+                          </p>
+                          <p className="text-slate-400 text-xs">
+                            Based on {p.reviewCount} reviews
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Book with this provider button */}
+                    <button
+                      onClick={() => onSelect(p)}
+                      className="w-full py-3 rounded-xl bg-blue-600 text-white font-semibold
+                                 text-sm hover:bg-blue-700 transition-colors flex items-center
+                                 justify-center gap-2"
+                    >
+                      Book with {p.name?.split(" ")[0]}{" "}
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
@@ -594,9 +685,8 @@ export default function BookAppointment() {
   const token = localStorage.getItem("token");
 
   const [step, setStep] = useState(1);
-  const [category, setCategory] = useState(null); // broad category e.g. "Fitness"
+  const [category, setCategory] = useState(null);
   const [provider, setProvider] = useState(null);
-  const [selectedService, setSelectedService] = useState(null); // exact spec e.g. "General Fitness"
   const [dateTime, setDateTime] = useState(null);
   const [booking, setBooking] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -616,7 +706,7 @@ export default function BookAppointment() {
         },
         body: JSON.stringify({
           providerId: provider._id,
-          specialization: selectedService, // exact service, not category
+          specialization: category,
           date: dateStr,
           timeSlot: dateTime.timeSlot,
         }),
@@ -624,7 +714,7 @@ export default function BookAppointment() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
       setBooking(data.appointment);
-      setStep(6);
+      setStep(5);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -635,7 +725,7 @@ export default function BookAppointment() {
   return (
     <Shell title="Book Appointment">
       <div className="max-w-3xl mx-auto">
-        {step < 6 && <Stepper step={step} />}
+        {step < 5 && <Stepper step={step} />}
 
         {/* Step 1 — Pick category */}
         {step === 1 && (
@@ -647,7 +737,7 @@ export default function BookAppointment() {
           />
         )}
 
-        {/* Step 2 — Pick provider filtered by category */}
+        {/* Step 2 — Pick provider */}
         {step === 2 && (
           <ChooseProvider
             service={category}
@@ -659,47 +749,35 @@ export default function BookAppointment() {
           />
         )}
 
-        {/* Step 3 — Pick exact specialization from that provider */}
+        {/* Step 3 — Pick date & time */}
         {step === 3 && (
-          <SelectSpecialization
+          <PickTime
             provider={provider}
-            onSelect={(spec) => {
-              setSelectedService(spec);
+            service={category}
+            onSelect={(dt) => {
+              setDateTime(dt);
               setStep(4);
             }}
             onBack={() => setStep(2)}
           />
         )}
 
-        {/* Step 4 — Pick date & time (slots use exact service duration) */}
+        {/* Step 4 — Confirm */}
         {step === 4 && (
-          <PickTime
-            provider={provider}
-            service={selectedService}
-            onSelect={(dt) => {
-              setDateTime(dt);
-              setStep(5);
-            }}
-            onBack={() => setStep(3)}
-          />
-        )}
-
-        {/* Step 5 — Confirm */}
-        {step === 5 && (
           <ConfirmBooking
-            service={selectedService}
+            service={category}
             provider={provider}
             date={dateTime.date}
             timeSlot={dateTime.timeSlot}
             onConfirm={handleConfirm}
-            onBack={() => setStep(4)}
+            onBack={() => setStep(3)}
             loading={loading}
             error={error}
           />
         )}
 
-        {/* Step 6 — Success */}
-        {step === 6 && (
+        {/* Step 5 — Success */}
+        {step === 5 && (
           <BookingSuccess
             booking={booking}
             onViewAppointments={() => navigate("/client/appointments")}

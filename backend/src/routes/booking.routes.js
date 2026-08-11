@@ -19,7 +19,7 @@ router.get("/providers", async (req, res) => {
     }
 
     const providers = await ServiceProvider.find(filter).select(
-      "name profession specializations address rating reviewCount bio isAvailable availability",
+      "name specializations address rating reviewCount bio isAvailable availability serviceName profession",
     );
 
     res.json({ providers });

@@ -197,7 +197,7 @@ export default function RegisterPage() {
           <div className="flex gap-3 mb-8">
             <RoleCard
               role="client"
-              label="Customer"
+              label="client"
               sub="Book services"
               icon={User}
               selected={role === "client"}
