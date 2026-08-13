@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 
-import { Lock, Bell, Mail, Phone, MapPin, Star, X } from "lucide-react";
+import { Lock, Bell, Mail, Phone, MapPin, Star, X, Camera } from "lucide-react";
 import ProviderShell from "../../components/layout/ProviderShell";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -58,6 +58,11 @@ export default function ProviderProfile() {
   const [newTag, setNewTag] = useState("");
   const [rating, setRating] = useState(0);
   const [reviewCount, setReviewCount] = useState(0);
+  const [profileImage, setProfileImage] = useState("");
+  const [editProfileOpen, setEditProfileOpen] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState("");
+  const [imageUploading, setImageUploading] = useState(false);
 
   // ── password state ─────────────────────────────────────────────────
   const [currentPassword, setCurrentPassword] = useState("");
@@ -101,6 +106,7 @@ export default function ProviderProfile() {
         setSpecializations(data.specializations || []);
         setRating(data.rating || 0);
         setReviewCount(data.reviewCount || 0);
+        setProfileImage(data.profileImage || "");
         setEmail(data.contactEmail || data.email || user.email || "");
         if (data.notificationPrefs) setPrefs(data.notificationPrefs);
       } catch (err) {
@@ -132,6 +138,7 @@ export default function ProviderProfile() {
           bio,
           isAvailable,
           specializations,
+          profileImage,
         }),
       });
       const data = await res.json();
@@ -149,6 +156,103 @@ export default function ProviderProfile() {
     } finally {
       setProfileLoading(false);
     }
+  }
+
+
+  // ── profile picture upload ──────────────────────────────────────────
+  function handleImageSelect(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setProfileMsg({ type: "error", text: "Please select an image file." });
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setProfileMsg({ type: "error", text: "Image must be smaller than 5 MB." });
+      return;
+    }
+
+    setSelectedImage(file);
+    setImagePreview(URL.createObjectURL(file));
+    setProfileMsg({ type: "", text: "" });
+  }
+
+  function fileToDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function handleProfileModalSave(e) {
+    e.preventDefault();
+    setProfileMsg({ type: "", text: "" });
+    setImageUploading(true);
+
+    try {
+      let newProfileImage = profileImage;
+
+      if (selectedImage) {
+        const image = await fileToDataUrl(selectedImage);
+        const uploadRes = await fetch(`${API}/api/provider/profile/image`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ image }),
+        });
+
+        const uploadData = await uploadRes.json();
+        if (!uploadRes.ok) throw new Error(uploadData.message);
+        newProfileImage = uploadData.profileImage;
+      }
+
+      const res = await fetch(`${API}/api/provider/profile`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name,
+          phone,
+          profession,
+          address,
+          bio,
+          isAvailable,
+          specializations,
+          profileImage: newProfileImage,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+
+      setProfileImage(newProfileImage);
+      setSelectedImage(null);
+      setImagePreview("");
+      setEditProfileOpen(false);
+      setProfileMsg({
+        type: "success",
+        text: "Profile updated successfully!",
+      });
+    } catch (err) {
+      setProfileMsg({ type: "error", text: err.message });
+    } finally {
+      setImageUploading(false);
+    }
+  }
+
+  function closeEditProfile() {
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setSelectedImage(null);
+    setImagePreview("");
+    setEditProfileOpen(false);
   }
 
   // ── change password ────────────────────────────────────────────────
@@ -306,19 +410,31 @@ export default function ProviderProfile() {
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
           <div className="flex items-center gap-4 mb-8">
             <div className="relative">
-              <div
-                className="w-20 h-20 rounded-full bg-purple-100 flex items-center
-                              justify-center text-2xl font-bold text-purple-700"
-              >
-                {initials}
+              <div className="w-20 h-20 rounded-full overflow-hidden bg-purple-100 flex items-center
+                              justify-center text-2xl font-bold text-purple-700 ring-2 ring-white shadow-sm">
+                {profileImage ? (
+                  <img
+                    src={profileImage}
+                    alt={name || "Profile"}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  initials
+                )}
               </div>
-              <div
+              <button
+                type="button"
+                onClick={() => {
+                  setImagePreview(profileImage);
+                  setEditProfileOpen(true);
+                }}
+                aria-label="Edit profile"
                 className="absolute bottom-0 right-0 w-7 h-7 bg-blue-600 rounded-full
                               flex items-center justify-center cursor-pointer
-                              hover:bg-blue-700 transition-colors"
+                              hover:bg-blue-700 transition-colors shadow-md"
               >
                 <span className="text-white text-xs">✏️</span>
-              </div>
+              </button>
             </div>
             <div>
               <h3 className="font-bold text-slate-900 text-lg">
@@ -503,6 +619,156 @@ export default function ProviderProfile() {
             </button>
           </form>
         </div>
+
+
+        {/* ── Edit Profile modal ── */}
+        {editProfileOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget) closeEditProfile();
+            }}
+          >
+            <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl">
+              <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Edit Profile</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Update your profile details and picture
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeEditProfile}
+                  className="w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center"
+                  aria-label="Close"
+                >
+                  <X className="w-5 h-5 text-slate-500" />
+                </button>
+              </div>
+
+              <form onSubmit={handleProfileModalSave} className="p-6 space-y-5">
+                <div className="flex flex-col items-center">
+                  <div className="relative">
+                    <div className="w-28 h-28 rounded-full overflow-hidden bg-purple-100
+                                    flex items-center justify-center text-3xl font-bold text-purple-700
+                                    ring-4 ring-slate-50">
+                      {imagePreview ? (
+                        <img
+                          src={imagePreview}
+                          alt="Profile preview"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        initials
+                      )}
+                    </div>
+
+                    <label
+                      htmlFor="provider-profile-image"
+                      className="absolute bottom-0 right-0 w-9 h-9 rounded-full bg-blue-600
+                                 text-white flex items-center justify-center cursor-pointer
+                                 hover:bg-blue-700 shadow-md"
+                      title="Choose profile picture"
+                    >
+                      <Camera className="w-4 h-4" />
+                    </label>
+                    <input
+                      id="provider-profile-image"
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className="hidden"
+                      onChange={handleImageSelect}
+                    />
+                  </div>
+                  <p className="text-xs text-slate-400 mt-2">
+                    JPG, PNG or WEBP · Maximum 5 MB
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field label="Name">
+                    <input
+                      className={INPUT}
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Your name"
+                      required
+                    />
+                  </Field>
+                  <Field label="Phone">
+                    <input
+                      className={INPUT}
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="Phone number"
+                    />
+                  </Field>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field label="Profession">
+                    <input
+                      className={INPUT}
+                      value={profession}
+                      onChange={(e) => setProfession(e.target.value)}
+                      placeholder="e.g. Dentist"
+                    />
+                  </Field>
+                  <Field label="Location">
+                    <input
+                      className={INPUT}
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      placeholder="Your location"
+                    />
+                  </Field>
+                </div>
+
+                <Field label="Bio">
+                  <textarea
+                    rows={4}
+                    className={INPUT}
+                    value={bio}
+                    onChange={(e) => setBio(e.target.value)}
+                    placeholder="Tell clients about yourself..."
+                  />
+                </Field>
+
+                {profileMsg.text && (
+                  <p
+                    className={`text-sm px-4 py-3 rounded-xl border ${
+                      profileMsg.type === "success"
+                        ? "bg-green-50 text-green-700 border-green-200"
+                        : "bg-red-50 text-red-600 border-red-200"
+                    }`}
+                  >
+                    {profileMsg.text}
+                  </p>
+                )}
+
+                <div className="flex justify-end gap-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={closeEditProfile}
+                    className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600
+                               font-semibold text-sm hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={imageUploading}
+                    className="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-semibold
+                               text-sm hover:bg-blue-700 disabled:opacity-60"
+                  >
+                    {imageUploading ? "Saving..." : "Save Changes"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
         {/* ── Change Password ── */}
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">

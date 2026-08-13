@@ -146,6 +146,7 @@ router.get("/profile", async (req, res) => {
       bio: provider.bio || "",
       contactEmail: provider.contactEmail || "",
       email: user?.email || "",
+      profileImage: provider.profileImage || "",
       rating: provider.rating || 0,
       reviewCount: provider.reviewCount || 0,
       isAvailable: provider.isAvailable ?? true,
@@ -175,6 +176,7 @@ router.put("/profile", async (req, res) => {
       specializations,
       isAvailable,
       notificationPrefs,
+      profileImage,
     } = req.body;
 
     const isProfileComplete = !!(name && phone && profession && address && bio);
@@ -187,6 +189,7 @@ router.put("/profile", async (req, res) => {
         profession,
         address,
         bio,
+        ...(profileImage !== undefined && { profileImage }),
         specializations: specializations || [],
         isAvailable: isAvailable ?? true,
         isProfileComplete,
@@ -203,6 +206,61 @@ router.put("/profile", async (req, res) => {
   } catch (err) {
     console.error("Update profile error:", err.message);
     res.status(500).json({ message: "Server error." });
+  }
+});
+
+
+// ── POST /api/provider/profile/image ─────────────────────────────────
+// Uploads a profile image to Cloudinary and saves the secure URL.
+router.post("/profile/image", async (req, res) => {
+  try {
+    const { image } = req.body;
+
+    if (!image || typeof image !== "string" || !image.startsWith("data:image/")) {
+      return res.status(400).json({ message: "A valid image is required." });
+    }
+
+    if (
+      !process.env.CLOUDINARY_CLOUD_NAME ||
+      !process.env.CLOUDINARY_API_KEY ||
+      !process.env.CLOUDINARY_API_SECRET
+    ) {
+      return res.status(500).json({
+        message: "Cloudinary is not configured on the server.",
+      });
+    }
+
+    const cloudinary = require("cloudinary").v2;
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+    });
+
+    const provider = await ServiceProvider.findOne({ user: req.auth.userId });
+    if (!provider) {
+      return res.status(404).json({ message: "Profile not found." });
+    }
+
+    const result = await cloudinary.uploader.upload(image, {
+      folder: "bookease/profile-images",
+      resource_type: "image",
+      transformation: [
+        { width: 500, height: 500, crop: "fill", gravity: "face" },
+        { quality: "auto", fetch_format: "auto" },
+      ],
+    });
+
+    provider.profileImage = result.secure_url;
+    await provider.save();
+
+    res.json({
+      message: "Profile picture updated.",
+      profileImage: provider.profileImage,
+    });
+  } catch (err) {
+    console.error("Profile image upload error:", err.message);
+    res.status(500).json({ message: "Failed to upload profile picture." });
   }
 });
 
