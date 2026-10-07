@@ -6,6 +6,7 @@ import {
   Star,
   ChevronRight,
   ChevronLeft,
+  AlertTriangle,
 } from "lucide-react";
 import Shell from "../../components/layout/Shell";
 
@@ -58,20 +59,15 @@ function Stepper({ step }) {
           <div key={i} className="flex items-center gap-2 shrink-0">
             <div
               className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold
-                ${done ? "bg-green-500 text-white" : ""}
-                ${current ? "bg-blue-600 text-white" : ""}
-                ${!done && !current ? "bg-slate-100 text-slate-400" : ""}`}
+              ${done ? "bg-green-500 text-white" : ""}
+              ${current ? "bg-blue-600 text-white" : ""}
+              ${!done && !current ? "bg-slate-100 text-slate-400" : ""}`}
             >
               {done ? <CheckCircle2 className="w-4 h-4" /> : num}
             </div>
             <span
-              className={`text-sm font-medium ${
-                current
-                  ? "text-blue-600"
-                  : done
-                    ? "text-green-600"
-                    : "text-slate-400"
-              }`}
+              className={`text-sm font-medium
+              ${current ? "text-blue-600" : done ? "text-green-600" : "text-slate-400"}`}
             >
               {s}
             </span>
@@ -119,7 +115,8 @@ function ChooseProvider({ service, onSelect, onBack }) {
   const token = localStorage.getItem("token");
   const [providers, setProviders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [expandedId, setExpandedId] = useState(null); // which provider is expanded
+  const [expandedId, setExpandedId] = useState(null);
+  const [fallbackMsg, setFallbackMsg] = useState("");
 
   useEffect(() => {
     async function fetchProviders() {
@@ -130,6 +127,11 @@ function ChooseProvider({ service, onSelect, onBack }) {
         );
         const data = await res.json();
         setProviders(data.providers || []);
+        if (data.fallback) {
+          setFallbackMsg(
+            `No providers found specifically for "${service}". Showing all available providers.`,
+          );
+        }
       } catch (err) {
         console.error(err);
       } finally {
@@ -139,7 +141,6 @@ function ChooseProvider({ service, onSelect, onBack }) {
     fetchProviders();
   }, [service]);
 
-  // get which days provider is available
   function getAvailableDays(provider) {
     const schedule = provider.availability?.weeklySchedule;
     if (!schedule) return [];
@@ -158,6 +159,16 @@ function ChooseProvider({ service, onSelect, onBack }) {
     });
   }
 
+  const DAY_SHORT = {
+    Monday: "Mon",
+    Tuesday: "Tue",
+    Wednesday: "Wed",
+    Thursday: "Thu",
+    Friday: "Fri",
+    Saturday: "Sat",
+    Sunday: "Sun",
+  };
+
   return (
     <div>
       <h2
@@ -166,6 +177,16 @@ function ChooseProvider({ service, onSelect, onBack }) {
       >
         Choose a provider
       </h2>
+
+      {/* Fallback message */}
+      {fallbackMsg && (
+        <p
+          className="flex items-center gap-2 text-amber-700 text-sm bg-amber-50 border border-amber-100
+                      rounded-xl px-4 py-3 mb-4"
+        >
+          <AlertTriangle className="w-4 h-4 shrink-0" /> {fallbackMsg}
+        </p>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-12">
@@ -192,15 +213,6 @@ function ChooseProvider({ service, onSelect, onBack }) {
               .toUpperCase();
             const isExpanded = expandedId === p._id;
             const availDays = getAvailableDays(p);
-            const DAY_SHORT = {
-              Monday: "Mon",
-              Tuesday: "Tue",
-              Wednesday: "Wed",
-              Thursday: "Thu",
-              Friday: "Fri",
-              Saturday: "Sat",
-              Sunday: "Sun",
-            };
 
             return (
               <div
@@ -208,17 +220,25 @@ function ChooseProvider({ service, onSelect, onBack }) {
                 className={`bg-white rounded-2xl border transition-all shadow-sm
                   ${isExpanded ? "border-blue-300 shadow-md" : "border-slate-100"}`}
               >
-                {/* ── Provider row — always visible ── */}
+                {/* Provider row */}
                 <button
                   onClick={() => setExpandedId(isExpanded ? null : p._id)}
                   className="w-full p-5 flex items-center gap-4 text-left"
                 >
-                  {/* Avatar */}
+                  {/* Avatar — shows image if available */}
                   <div
-                    className="w-14 h-14 rounded-full bg-purple-100 flex items-center
+                    className="w-14 h-14 rounded-full overflow-hidden bg-purple-100 flex items-center
                                   justify-center shrink-0 text-xl font-bold text-purple-700"
                   >
-                    {initials}
+                    {p.profileImage ? (
+                      <img
+                        src={p.profileImage}
+                        alt={p.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      initials
+                    )}
                   </div>
 
                   {/* Info */}
@@ -227,11 +247,7 @@ function ChooseProvider({ service, onSelect, onBack }) {
                       <span className="font-bold text-slate-900">{p.name}</span>
                       <span
                         className={`text-xs font-semibold px-2 py-0.5 rounded-full
-                        ${
-                          p.isAvailable
-                            ? "bg-green-100 text-green-700"
-                            : "bg-slate-100 text-slate-500"
-                        }`}
+                        ${p.isAvailable ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-500"}`}
                       >
                         {p.isAvailable ? "Available" : "Busy"}
                       </span>
@@ -243,10 +259,7 @@ function ChooseProvider({ service, onSelect, onBack }) {
                       {p.address ? ` · 📍 ${p.address}` : ""}
                     </p>
                     {p.rating > 0 && (
-                      <span
-                        className="flex items-center gap-1 text-sm text-amber-500
-                                       font-semibold mt-1"
-                      >
+                      <span className="flex items-center gap-1 text-sm text-amber-500 font-semibold mt-1">
                         <Star className="w-3.5 h-3.5 fill-amber-400" />
                         {p.rating.toFixed(1)}
                         <span className="text-slate-400 font-normal">
@@ -256,23 +269,19 @@ function ChooseProvider({ service, onSelect, onBack }) {
                     )}
                   </div>
 
-                  {/* Expand arrow */}
                   <ChevronRight
                     className={`w-5 h-5 text-slate-300 shrink-0 transition-transform
                                             ${isExpanded ? "rotate-90" : ""}`}
                   />
                 </button>
 
-                {/* ── Expanded detail panel ── */}
+                {/* Expanded detail panel */}
                 {isExpanded && (
                   <div className="px-5 pb-5 border-t border-slate-100 pt-4">
                     {/* Bio */}
                     {p.bio && (
                       <div className="mb-4">
-                        <p
-                          className="text-xs font-semibold text-slate-500 uppercase
-                                      tracking-wide mb-1.5"
-                        >
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
                           About
                         </p>
                         <p className="text-slate-600 text-sm leading-relaxed">
@@ -284,10 +293,7 @@ function ChooseProvider({ service, onSelect, onBack }) {
                     {/* Specializations */}
                     {p.specializations?.length > 0 && (
                       <div className="mb-4">
-                        <p
-                          className="text-xs font-semibold text-slate-500 uppercase
-                                      tracking-wide mb-2"
-                        >
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
                           Specializations
                         </p>
                         <div className="flex flex-wrap gap-2">
@@ -307,10 +313,7 @@ function ChooseProvider({ service, onSelect, onBack }) {
                     {/* Available days */}
                     {availDays.length > 0 && (
                       <div className="mb-5">
-                        <p
-                          className="text-xs font-semibold text-slate-500 uppercase
-                                      tracking-wide mb-2"
-                        >
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
                           Available Days
                         </p>
                         <div className="flex flex-wrap gap-2">
@@ -342,7 +345,7 @@ function ChooseProvider({ service, onSelect, onBack }) {
                       </div>
                     )}
 
-                    {/* Rating summary */}
+                    {/* Rating */}
                     {p.rating > 0 && (
                       <div
                         className="flex items-center gap-3 mb-5 bg-amber-50
@@ -360,7 +363,7 @@ function ChooseProvider({ service, onSelect, onBack }) {
                       </div>
                     )}
 
-                    {/* Book with this provider button */}
+                    {/* Book button */}
                     <button
                       onClick={() => onSelect(p)}
                       className="w-full py-3 rounded-xl bg-blue-600 text-white font-semibold
@@ -405,11 +408,7 @@ function PickTime({ provider, service, onSelect, onBack }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
-  useEffect(() => {
-    fetchSlots(selectedDate);
-  }, [selectedDate]);
-
-  async function fetchSlots(date) {
+  const fetchSlots = async (date) => {
     setLoading(true);
     setSlots([]);
     setSelectedSlot(null);
@@ -428,7 +427,11 @@ function PickTime({ provider, service, onSelect, onBack }) {
     } finally {
       setLoading(false);
     }
-  }
+  };
+
+  useEffect(() => {
+    fetchSlots(selectedDate);
+  }, [selectedDate]);
 
   return (
     <div>
@@ -453,11 +456,7 @@ function PickTime({ provider, service, onSelect, onBack }) {
                 key={i}
                 onClick={() => setSelectedDate(d)}
                 className={`flex flex-col items-center p-3 rounded-xl min-w-14 transition-all
-                  ${
-                    isSelected
-                      ? "bg-blue-600 text-white"
-                      : "bg-slate-50 text-slate-700 hover:bg-blue-50"
-                  }`}
+                  ${isSelected ? "bg-blue-600 text-white" : "bg-slate-50 text-slate-700 hover:bg-blue-50"}`}
               >
                 <span className="text-xs font-medium">
                   {DAY_NAMES_SHORT[d.getDay()]}
@@ -558,17 +557,24 @@ function ConfirmBooking({
       </h2>
 
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 mb-6">
-        {/* Provider summary */}
         <div className="flex items-center gap-4 pb-5 border-b border-slate-100 mb-5">
           <div
-            className="w-14 h-14 rounded-full bg-purple-100 flex items-center
-                          justify-center text-xl font-bold text-purple-700"
+            className="w-14 h-14 rounded-full overflow-hidden bg-purple-100 flex items-center
+                          justify-center text-xl font-bold text-purple-700 shrink-0"
           >
-            {(provider.name || "P")
-              .split(" ")
-              .map((n) => n[0])
-              .join("")
-              .toUpperCase()}
+            {provider.profileImage ? (
+              <img
+                src={provider.profileImage}
+                alt={provider.name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              (provider.name || "P")
+                .split(" ")
+                .map((n) => n[0])
+                .join("")
+                .toUpperCase()
+            )}
           </div>
           <div>
             <p className="font-bold text-slate-900 text-lg">{provider.name}</p>
@@ -629,7 +635,10 @@ function ConfirmBooking({
 function BookingSuccess({ booking, onViewAppointments }) {
   return (
     <div className="text-center py-8">
-      <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-6">
+      <div
+        className="w-20 h-20 rounded-full bg-green-100 flex items-center
+                      justify-center mx-auto mb-6"
+      >
         <CheckCircle2 className="w-10 h-10 text-green-500" />
       </div>
       <h2
@@ -727,7 +736,6 @@ export default function BookAppointment() {
       <div className="max-w-3xl mx-auto">
         {step < 5 && <Stepper step={step} />}
 
-        {/* Step 1 — Pick category */}
         {step === 1 && (
           <SelectService
             onSelect={(s) => {
@@ -736,8 +744,6 @@ export default function BookAppointment() {
             }}
           />
         )}
-
-        {/* Step 2 — Pick provider */}
         {step === 2 && (
           <ChooseProvider
             service={category}
@@ -748,8 +754,6 @@ export default function BookAppointment() {
             onBack={() => setStep(1)}
           />
         )}
-
-        {/* Step 3 — Pick date & time */}
         {step === 3 && (
           <PickTime
             provider={provider}
@@ -761,8 +765,6 @@ export default function BookAppointment() {
             onBack={() => setStep(2)}
           />
         )}
-
-        {/* Step 4 — Confirm */}
         {step === 4 && (
           <ConfirmBooking
             service={category}
@@ -775,8 +777,6 @@ export default function BookAppointment() {
             error={error}
           />
         )}
-
-        {/* Step 5 — Success */}
         {step === 5 && (
           <BookingSuccess
             booking={booking}

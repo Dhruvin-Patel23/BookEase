@@ -8,11 +8,30 @@ const clientSchema = new mongoose.Schema(
       required: true,
       unique: true,
     },
-    name: { type: String, required: true, trim: true },
-    address: { type: String, trim: true },
-    dateOfBirth: { type: Date },
-    phone: { type: String, trim: true },
-    profileImage: { type: String },
+
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    address: {
+      type: String,
+      trim: true,
+    },
+
+    dateOfBirth: {
+      type: Date,
+    },
+
+    phone: {
+      type: String,
+      trim: true,
+    },
+
+    profileImage: {
+      type: String,
+    },
   },
   { timestamps: true },
 );

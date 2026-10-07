@@ -145,9 +145,16 @@ export default function ProviderProfile() {
       if (!res.ok) throw new Error(data.message);
 
       const stored = JSON.parse(localStorage.getItem("user") || "{}");
+
       localStorage.setItem(
         "user",
-        JSON.stringify({ ...stored, name, profession, address }),
+        JSON.stringify({
+          ...stored,
+          name,
+          profession,
+          address,
+          profileImage: profileImage, // ← use the state variable
+        }),
       );
 
       setProfileMsg({ type: "success", text: "Profile updated successfully!" });
@@ -157,7 +164,6 @@ export default function ProviderProfile() {
       setProfileLoading(false);
     }
   }
-
 
   // ── profile picture upload ──────────────────────────────────────────
   function handleImageSelect(e) {
@@ -170,7 +176,10 @@ export default function ProviderProfile() {
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      setProfileMsg({ type: "error", text: "Image must be smaller than 5 MB." });
+      setProfileMsg({
+        type: "error",
+        text: "Image must be smaller than 5 MB.",
+      });
       return;
     }
 
@@ -410,8 +419,10 @@ export default function ProviderProfile() {
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
           <div className="flex items-center gap-4 mb-8">
             <div className="relative">
-              <div className="w-20 h-20 rounded-full overflow-hidden bg-purple-100 flex items-center
-                              justify-center text-2xl font-bold text-purple-700 ring-2 ring-white shadow-sm">
+              <div
+                className="w-20 h-20 rounded-full overflow-hidden bg-purple-100 flex items-center
+                              justify-center text-2xl font-bold text-purple-700 ring-2 ring-white shadow-sm"
+              >
                 {profileImage ? (
                   <img
                     src={profileImage}
@@ -620,7 +631,6 @@ export default function ProviderProfile() {
           </form>
         </div>
 
-
         {/* ── Edit Profile modal ── */}
         {editProfileOpen && (
           <div
@@ -632,7 +642,9 @@ export default function ProviderProfile() {
             <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl">
               <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
                 <div>
-                  <h3 className="text-lg font-bold text-slate-900">Edit Profile</h3>
+                  <h3 className="text-lg font-bold text-slate-900">
+                    Edit Profile
+                  </h3>
                   <p className="text-xs text-slate-400 mt-0.5">
                     Update your profile details and picture
                   </p>
@@ -650,9 +662,11 @@ export default function ProviderProfile() {
               <form onSubmit={handleProfileModalSave} className="p-6 space-y-5">
                 <div className="flex flex-col items-center">
                   <div className="relative">
-                    <div className="w-28 h-28 rounded-full overflow-hidden bg-purple-100
+                    <div
+                      className="w-28 h-28 rounded-full overflow-hidden bg-purple-100
                                     flex items-center justify-center text-3xl font-bold text-purple-700
-                                    ring-4 ring-slate-50">
+                                    ring-4 ring-slate-50"
+                    >
                       {imagePreview ? (
                         <img
                           src={imagePreview}

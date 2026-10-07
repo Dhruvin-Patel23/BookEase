@@ -78,11 +78,11 @@ function LeftPanel() {
         </span>
       </div>
 
-      <div className="rounded-2xl overflow-hidden">
+      <div className="rounded-2xl overflow-hidden shadow-2xl">
         <img
-          src="https://images.unsplash.com/photo-1551601651-2a8555f1a136?w=580&h=420&fit=crop&auto=format"
-          alt="Medical professional"
-          className="w-full object-cover"
+          src="/auth-booking.jpg"
+          alt="Appointment booking & schedule management"
+          className="w-full object-cover aspect-[4/3]"
         />
       </div>
 

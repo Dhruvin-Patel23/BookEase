@@ -2,10 +2,12 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bell, LogOut, Menu } from "lucide-react";
 import ProviderSidebar from "./ProviderSidebar";
+import { useNotifications } from "../../context/NotificationContext";
 
 export default function ProviderShell({ children, title }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const { unreadCount } = useNotifications();
 
   function logout() {
     localStorage.removeItem("token");
@@ -41,15 +43,17 @@ export default function ProviderShell({ children, title }) {
           </div>
 
           <div className="flex items-center gap-2">
-            <button className="relative p-2 rounded-xl hover:bg-slate-50">
+            <button
+              onClick={() => navigate("/provider/notifications")}
+              className="relative p-2 rounded-xl hover:bg-slate-50 transition-colors"
+              title={unreadCount > 0 ? `${unreadCount} unread notification${unreadCount > 1 ? "s" : ""}` : "Notifications"}
+            >
               <Bell className="w-5 h-5 text-slate-500" />
-              <span className="absolute top-1.5 right-1.5 flex h-2.5 w-2.5">
-                <span
-                  className="animate-ping absolute inline-flex h-full w-full
-                                 rounded-full bg-blue-400 opacity-75"
-                />
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-600" />
-              </span>
+              {unreadCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 bg-purple-600 text-white text-[10px] font-bold px-1.5 rounded-full min-w-[18px] h-[18px] flex items-center justify-center shadow-sm">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
             </button>
             <button
               onClick={logout}

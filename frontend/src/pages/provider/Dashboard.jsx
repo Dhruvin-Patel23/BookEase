@@ -10,9 +10,12 @@ import {
   Check,
   X,
   ChevronRight,
+  Bell,
+  AlertTriangle,
 } from "lucide-react";
 import ProviderShell from "../../components/layout/ProviderShell";
 import StatCard from "../../components/common/StatCard";
+import { useNotifications } from "../../context/NotificationContext";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -23,12 +26,21 @@ function getGreeting() {
   return "Good evening";
 }
 
-function Avatar({ initials, bg = "bg-purple-100", text = "text-purple-700" }) {
+function Avatar({
+  initials,
+  image,
+  bg = "bg-purple-100",
+  text = "text-purple-700",
+}) {
   return (
     <div
-      className={`w-10 h-10 rounded-full ${bg} flex items-center justify-center shrink-0`}
+      className={`w-10 h-10 rounded-full ${bg} flex items-center justify-center shrink-0 overflow-hidden`}
     >
-      <span className={`font-bold text-sm ${text}`}>{initials}</span>
+      {image ? (
+        <img src={image} alt="Profile" className="w-full h-full object-cover" />
+      ) : (
+        <span className={`font-bold text-sm ${text}`}>{initials}</span>
+      )}
     </div>
   );
 }
@@ -109,7 +121,9 @@ export default function ProviderDashboard() {
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const token = localStorage.getItem("token");
+  const { unreadCount } = useNotifications();
 
+  const [profileImage, setProfileImage] = useState("");
   const [stats, setStats] = useState(null);
   const [pendingList, setPendingList] = useState([]);
   const [confirmedToday, setConfirmedToday] = useState([]);
@@ -121,24 +135,43 @@ export default function ProviderDashboard() {
     async function fetchDashboard() {
       try {
         setLoading(true);
+
         const res = await fetch(`${API}/api/provider/dashboard`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         });
+
         const data = await res.json();
+
         if (!res.ok) throw new Error(data.message);
 
         setStats(data.stats);
         setPendingList(data.pendingRequests);
         setConfirmedToday(data.confirmedToday);
-        setIsProfileComplete(data.isProfileComplete ?? false); // ✅ set here
+        setIsProfileComplete(data.isProfileComplete ?? false);
+
+        // Get provider profile
+        const profileRes = await fetch(`${API}/api/provider/profile`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const profileData = await profileRes.json();
+
+        if (profileRes.ok) {
+          setProfileImage(profileData.profileImage || "");
+        }
       } catch (err) {
         setError(err.message);
       } finally {
         setLoading(false);
       }
     }
+
     fetchDashboard();
-  }, []);
+  }, [token]);
 
   async function handleAccept(req) {
     try {
@@ -230,15 +263,22 @@ export default function ProviderDashboard() {
             }}
           />
           <div className="relative flex items-start gap-4">
-            <div
-              className="w-14 h-14 rounded-full bg-white/20 flex items-center
-                            justify-center shrink-0 text-xl font-bold text-white"
-            >
-              {user.name
-                ?.split(" ")
-                .map((n) => n[0])
-                .join("")
-                .toUpperCase() || "P"}
+            <div className="w-14 h-14 rounded-full bg-white/20 overflow-hidden flex items-center justify-center shrink-0">
+              {profileImage ? (
+                <img
+                  src={profileImage}
+                  alt={user.name || "Profile"}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="text-xl font-bold text-white">
+                  {user.name
+                    ?.split(" ")
+                    .map((n) => n[0])
+                    .join("")
+                    .toUpperCase() || "P"}
+                </span>
+              )}
             </div>
             <div className="flex-1">
               <h2
@@ -261,20 +301,13 @@ export default function ProviderDashboard() {
                   <Calendar className="w-4 h-4" /> View Appointments
                 </button>
                 <button
-                  onClick={() => navigate("/provider/calendar")}
-                  className="flex items-center gap-2 bg-white/15 border border-white/30
-                             text-white font-semibold text-sm px-4 py-2 rounded-xl
-                             hover:bg-white/25 transition-colors"
-                >
-                  <Calendar className="w-4 h-4" /> Open Calendar
-                </button>
-                <button
                   onClick={() => navigate("/provider/notifications")}
                   className="flex items-center gap-2 bg-white/15 border border-white/30
                              text-white font-semibold text-sm px-4 py-2 rounded-xl
                              hover:bg-white/25 transition-colors"
                 >
-                  🔔 {stats?.pendingRequests || 0} new
+                  <Bell className="w-4 h-4" />
+                  {unreadCount > 0 ? `${unreadCount} new` : "Notifications"}
                 </button>
               </div>
             </div>
@@ -291,9 +324,9 @@ export default function ProviderDashboard() {
           >
             <div
               className="w-10 h-10 rounded-xl bg-amber-100 flex items-center
-                            justify-center shrink-0 text-xl"
+                            justify-center shrink-0"
             >
-              ⚠️
+              <AlertTriangle className="w-5 h-5 text-amber-600" />
             </div>
             <div className="flex-1">
               <p className="font-semibold text-amber-800 text-sm">
@@ -368,7 +401,7 @@ export default function ProviderDashboard() {
                 className="bg-white rounded-2xl border border-slate-100
                               shadow-sm p-10 text-center"
               >
-                <p className="text-2xl mb-2">🎉</p>
+                <CheckCircle2 className="w-12 h-12 text-green-400 mx-auto mb-3" />
                 <p className="font-semibold text-slate-900">All caught up!</p>
                 <p className="text-slate-400 text-sm mt-1">
                   No pending requests right now.

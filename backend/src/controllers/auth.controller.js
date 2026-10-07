@@ -55,6 +55,7 @@ exports.register = async (req, res) => {
       email: email.toLowerCase(),
       password: hashed,
       role,
+      name: name.trim(),
     });
 
     // 5. Create role-specific profile

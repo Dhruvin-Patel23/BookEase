@@ -11,6 +11,7 @@ const userSchema = new mongoose.Schema(
     },
     password: { type: String, required: true, select: false },
     role: { type: String, enum: ["client", "provider"], required: true },
+    name: { type: String, trim: true, default: "" },
     resetOTP: { type: String, select: false },
     resetOTPExpires: { type: Date, select: false },
     resetOTPVerified: { type: Boolean, default: false, select: false },

@@ -7,6 +7,7 @@ import {
   Bell,
   User,
 } from "lucide-react";
+import { useNotifications } from "../../context/NotificationContext";
 
 const NAV = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/client/dashboard" },
@@ -27,6 +28,7 @@ const NAV = [
 
 export default function Sidebar({ open, onClose }) {
   const location = useLocation();
+  const { unreadCount } = useNotifications();
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const initials =
     user.name
@@ -93,10 +95,15 @@ export default function Sidebar({ open, onClose }) {
               >
                 <Icon className="w-5 h-5 shrink-0" />
                 {label}
-                {badge && (
-                  <span className="ml-auto relative flex h-3 w-3">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-600" />
+                {badge && unreadCount > 0 && (
+                  <span
+                    className={`ml-auto text-xs font-bold px-2 py-0.5 rounded-full ${
+                      active
+                        ? "bg-white text-blue-700"
+                        : "bg-blue-100 text-blue-700"
+                    }`}
+                  >
+                    {unreadCount > 99 ? "99+" : unreadCount}
                   </span>
                 )}
               </Link>

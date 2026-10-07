@@ -145,9 +145,9 @@ function Hero() {
 
         <div className="relative">
           <motion.img
-            src="https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=580&h=460&fit=crop&auto=format"
-            alt="Provider using BookEase on their phone"
-            className="rounded-2xl shadow-2xl w-full object-cover"
+            src="/hero-booking.jpg"
+            alt="Appointment Booking & Scheduling with BookEase"
+            className="rounded-2xl shadow-2xl w-full object-cover aspect-[4/3]"
             animate={{ y: [0, -12, 0] }}
             transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
           />
@@ -230,22 +230,27 @@ function WhyBookEase() {
         </p>
 
         <div className="grid md:grid-cols-3 gap-6 text-left">
-          {FEATURES.map((f, i) => (
-            <motion.div
-              key={f.title}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.3 }}
-              transition={{ duration: 0.4, delay: i * 0.07 }}
-              className="bg-slate-50 rounded-2xl p-6"
-            >
-              <span className="text-2xl">{f.icon}</span>
-              <h3 className="font-semibold text-slate-900 mt-4 mb-2">
-                {f.title}
-              </h3>
-              <p className="text-slate-500 text-sm leading-relaxed">{f.desc}</p>
-            </motion.div>
-          ))}
+          {FEATURES.map((f, i) => {
+            const Icon = f.icon;
+            return (
+              <motion.div
+                key={f.title}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.3 }}
+                transition={{ duration: 0.4, delay: i * 0.07 }}
+                className="bg-slate-50 rounded-2xl p-6"
+              >
+                <div className={`w-10 h-10 rounded-xl ${f.iconBg} flex items-center justify-center mb-4`}>
+                  <Icon className={`w-5 h-5 ${f.iconColor}`} />
+                </div>
+                <h3 className="font-semibold text-slate-900 mb-2">
+                  {f.title}
+                </h3>
+                <p className="text-slate-500 text-sm leading-relaxed">{f.desc}</p>
+              </motion.div>
+            );
+          })}
         </div>
       </div>
     </section>

@@ -6,21 +6,99 @@ const Appointment = require("../models/Appointment.model");
 router.use(requireAuth);
 router.use(requireRole("client"));
 
-// ── GET /api/booking/providers?specialization=Fitness ─────────────────
+// ── Category → keyword mapping ────────────────────────────────────────
+const CATEGORY_KEYWORDS = {
+  "Hair & Beauty": [
+    "hair",
+    "beauty",
+    "salon",
+    "barber",
+    "cosmetic",
+    "skin",
+    "makeup",
+    "grooming",
+  ],
+  "Dental Care": ["dental", "dentist", "teeth", "orthodont", "oral", "tooth"],
+  Medical: [
+    "medical",
+    "doctor",
+    "physician",
+    "health",
+    "clinic",
+    "general",
+    "medicine",
+  ],
+  Fitness: [
+    "fitness",
+    "gym",
+    "trainer",
+    "workout",
+    "exercise",
+    "strength",
+    "weight",
+    "muscle",
+    "fat loss",
+    "lifestyle",
+    "functional",
+    "personal trainer",
+  ],
+  Massage: [
+    "massage",
+    "therapy",
+    "relaxation",
+    "therapeutic",
+    "deep tissue",
+    "spa",
+  ],
+  Nutrition: [
+    "nutrition",
+    "diet",
+    "food",
+    "meal",
+    "wellness",
+    "health coach",
+    "nutritionist",
+  ],
+};
+
+// ── GET /api/booking/providers ────────────────────────────────────────
 router.get("/providers", async (req, res) => {
   try {
     const { specialization } = req.query;
 
-    const filter = { isAvailable: true };
-    if (specialization) {
-      filter.specializations = {
-        $elemMatch: { $regex: new RegExp(specialization, "i") },
-      };
-    }
+    let providers = [];
 
-    const providers = await ServiceProvider.find(filter).select(
-      "name specializations address rating reviewCount bio isAvailable availability serviceName profession",
-    );
+    if (specialization) {
+      const keywords = CATEGORY_KEYWORDS[specialization] || [
+        specialization.toLowerCase(),
+      ];
+      const regexList = keywords.map((k) => new RegExp(k, "i"));
+
+      // search across all relevant fields
+      providers = await ServiceProvider.find({
+        isAvailable: true,
+        $or: [
+          { specializations: { $elemMatch: { $in: regexList } } },
+          { profession: { $in: regexList } },
+          { serviceName: { $in: regexList } },
+          { bio: { $in: regexList } },
+        ],
+      }).select(
+        "name specializations address rating reviewCount bio isAvailable availability serviceName profession profileImage",
+      );
+
+      // fallback — if no match, return all available providers
+      if (providers.length === 0) {
+        providers = await ServiceProvider.find({ isAvailable: true }).select(
+          "name specializations address rating reviewCount bio isAvailable availability serviceName profession profileImage",
+        );
+        return res.json({ providers, fallback: true });
+      }
+    } else {
+      providers = await ServiceProvider.find({ isAvailable: true }).select(
+        "name specializations address rating reviewCount bio isAvailable availability serviceName profession profileImage",
+      );
+    }
 
     res.json({ providers });
   } catch (err) {
@@ -29,7 +107,7 @@ router.get("/providers", async (req, res) => {
   }
 });
 
-// ── GET /api/booking/slots?providerId=&date=2026-07-16 ────────────────
+// ── GET /api/booking/slots ────────────────────────────────────────────
 router.get("/slots", async (req, res) => {
   try {
     const { providerId, date, specialization } = req.query;
@@ -45,7 +123,7 @@ router.get("/slots", async (req, res) => {
       return res.status(404).json({ message: "Provider not found." });
     }
 
-    // parse as LOCAL date to avoid UTC timezone day shift
+    // parse as local date to avoid UTC timezone day shift
     const [yr, mo, dy] = date.split("-").map(Number);
     const dateObj = new Date(yr, mo - 1, dy);
     const dayNames = [
@@ -59,7 +137,7 @@ router.get("/slots", async (req, res) => {
     ];
     const dayName = dayNames[dateObj.getDay()];
 
-    // ── weeklySchedule is Mixed (plain object), use bracket access ──
+    // check weekly schedule
     const weeklySchedule = provider.availability?.weeklySchedule || {};
     const schedule = weeklySchedule[dayName];
 
@@ -70,18 +148,25 @@ router.get("/slots", async (req, res) => {
       });
     }
 
-    // check blocked periods
+    // check blocked periods using Date comparison
     const isBlocked = (provider.availability?.blockedPeriods || []).some(
-      (bp) => date >= bp.startDate && date <= bp.endDate,
+      (bp) => {
+        const checkDate = new Date(yr, mo - 1, dy);
+        const blockStart = new Date(bp.startDate);
+        const blockEnd = new Date(bp.endDate);
+        blockEnd.setHours(23, 59, 59, 999);
+        return checkDate >= blockStart && checkDate <= blockEnd;
+      },
     );
+
     if (isBlocked) {
       return res.json({
         slots: [],
-        message: "Provider is not available on this date.",
+        message: "Provider is not available on this date (blocked).",
       });
     }
 
-    // ── serviceDurations is Mixed (plain object), use bracket access ──
+    // get slot duration
     const serviceDurations = provider.availability?.serviceDurations || {};
     let duration = provider.availability?.defaultDuration || 30;
     if (specialization && serviceDurations[specialization]) {
@@ -101,11 +186,9 @@ router.get("/slots", async (req, res) => {
       buffer,
     );
 
-    // find already booked slots
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
+    // find already booked slots using local date range
+    const startOfDay = new Date(yr, mo - 1, dy, 0, 0, 0, 0);
+    const endOfDay = new Date(yr, mo - 1, dy, 23, 59, 59, 999);
 
     const bookedApts = await Appointment.find({
       provider: providerId,
@@ -137,11 +220,10 @@ router.post("/book", async (req, res) => {
       return res.status(400).json({ message: "All fields are required." });
     }
 
-    // prevent double booking
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
+    // prevent double booking using local date range
+    const [yr, mo, dy] = date.split("-").map(Number);
+    const startOfDay = new Date(yr, mo - 1, dy, 0, 0, 0, 0);
+    const endOfDay = new Date(yr, mo - 1, dy, 23, 59, 59, 999);
 
     const existing = await Appointment.findOne({
       provider: providerId,
@@ -167,12 +249,36 @@ router.post("/book", async (req, res) => {
       user: userId,
       provider: providerId,
       service: specialization,
-      date: new Date(date),
+      date: new Date(yr, mo - 1, dy),
       timeSlot,
       duration,
       notes: notes || "",
       status: "pending",
     });
+
+    try {
+      const Notification = require("../models/Notification.model");
+      if (provider?.user) {
+        await Notification.create({
+          recipient: provider.user,
+          recipientRole: "provider",
+          title: "New Appointment Request",
+          message: `New booking request for ${specialization} on ${new Date(yr, mo - 1, dy).toLocaleDateString("en-US", { month: "short", day: "numeric" })} at ${timeSlot}.`,
+          type: "booking_created",
+          appointment: appointment._id,
+        });
+      }
+      await Notification.create({
+        recipient: userId,
+        recipientRole: "client",
+        title: "Appointment Booked",
+        message: `Your booking for ${specialization} with ${provider?.name || "Provider"} is pending confirmation.`,
+        type: "booking_created",
+        appointment: appointment._id,
+      });
+    } catch (notifErr) {
+      console.warn("Failed to create booking notifications:", notifErr.message);
+    }
 
     res.status(201).json({
       message: "Appointment booked successfully.",
@@ -180,7 +286,7 @@ router.post("/book", async (req, res) => {
         id: appointment._id,
         service: appointment.service,
         providerName: provider?.name || "Unknown",
-        date: new Date(date).toLocaleDateString("en-US", {
+        date: new Date(yr, mo - 1, dy).toLocaleDateString("en-US", {
           month: "long",
           day: "numeric",
           year: "numeric",

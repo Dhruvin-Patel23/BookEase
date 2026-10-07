@@ -8,7 +8,6 @@ import {
   EyeOff,
 } from "lucide-react";
 import Btn from "../../components/common/Btn";
-import api from "../../api/client";
 
 const ROLES = [
   { key: "client", label: "Client", sub: "Book services", icon: User },
@@ -75,9 +74,9 @@ export default function LoginPage() {
 
         <div>
           <img
-            src="https://images.unsplash.com/photo-1551601651-2a8555f1a136?w=580&h=420&fit=crop&auto=format"
-            alt="Provider at work"
-            className="rounded-2xl shadow-2xl w-full object-cover mb-10"
+            src="/auth-booking.jpg"
+            alt="Seamless appointment scheduling"
+            className="rounded-2xl shadow-2xl w-full object-cover mb-10 aspect-[4/3]"
           />
           <h1
             className="text-4xl font-extrabold leading-tight mb-3"

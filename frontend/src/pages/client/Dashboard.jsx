@@ -11,6 +11,8 @@ import {
   Plus,
   ChevronRight,
   Bell,
+  Star,
+  RefreshCw,
 } from "lucide-react";
 import Shell from "../../components/layout/Shell";
 import StatCard from "../../components/common/StatCard";
@@ -18,15 +20,15 @@ import Pill from "../../components/common/Pill";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
-const SERVICES = [
-  "Hair & Beauty",
-  "Dental Care",
-  "Medical",
-  "Fitness",
-  "Massage",
-  "Nutrition",
-];
-const PROVIDERS = ["Dr. Sarah Mitchell", "James Torres", "Priya Sharma"];
+const NOTIF_ICONS = {
+  booking_created: { icon: Calendar, bg: "bg-blue-100", color: "text-blue-600" },
+  booking_confirmed: { icon: CheckCircle2, bg: "bg-green-100", color: "text-green-600" },
+  booking_cancelled: { icon: XCircle, bg: "bg-red-100", color: "text-red-500" },
+  booking_completed: { icon: CheckCircle2, bg: "bg-purple-100", color: "text-purple-600" },
+  booking_rescheduled: { icon: RefreshCw, bg: "bg-amber-100", color: "text-amber-600" },
+  review_received: { icon: Star, bg: "bg-amber-100", color: "text-amber-500" },
+  system: { icon: Bell, bg: "bg-slate-100", color: "text-slate-500" },
+};
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -91,14 +93,10 @@ export default function ClientDashboard() {
   const token = localStorage.getItem("token");
 
   const [stats, setStats] = useState(null);
-  const [nextApt, setNextApt] = useState(null);
   const [upcomingApts, setUpcomingApts] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
-  const [service, setService] = useState(SERVICES[0]);
-  const [provider, setProvider] = useState(PROVIDERS[0]);
 
   useEffect(() => {
     async function fetchDashboard() {
@@ -111,7 +109,6 @@ export default function ClientDashboard() {
         if (!res.ok) throw new Error(data.message);
 
         setStats(data.stats);
-        setNextApt(data.nextAppointment);
         setUpcomingApts(data.upcomingAppointments);
         setNotifications(data.notifications);
       } catch (err) {
@@ -123,14 +120,26 @@ export default function ClientDashboard() {
     fetchDashboard();
   }, []);
 
-  function handleView(apt) {
-    navigate(`/client/appointments/${apt.id}`);
+  function handleView() {
+    navigate("/client/appointments");
   }
   function handleReschedule(apt) {
-    navigate(`/client/appointments/${apt.id}/reschedule`);
+    navigate(`/client/book?reschedule=${apt.id}&service=${encodeURIComponent(apt.service)}`);
   }
-  function handleCancel(apt) {
-    alert(`Cancel: ${apt.service}`);
+  async function handleCancel(apt) {
+    if (!window.confirm(`Cancel your ${apt.service} appointment?`)) return;
+    try {
+      const res = await fetch(`${API}/api/client/appointments/${apt.id}/cancel`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ reason: "" }),
+      });
+      if (!res.ok) throw new Error("Failed to cancel");
+      // Refresh dashboard
+      window.location.reload();
+    } catch (err) {
+      alert(err.message);
+    }
   }
 
   if (loading) {
@@ -231,233 +240,104 @@ export default function ClientDashboard() {
         </div>
 
         {/* ── Bottom two columns ── */}
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Left col */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Next appointment */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+        <div className="grid lg:grid-cols-2 gap-6">
+          {/* Upcoming appointments */}
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+            <div className="flex items-center justify-between mb-4">
               <h3
-                className="font-bold text-slate-900 mb-4"
+                className="font-bold text-slate-900"
                 style={{ fontFamily: "Poppins" }}
               >
-                Next Appointment
+                Upcoming Appointments
               </h3>
-              {nextApt ? (
-                <div className="flex items-start gap-4">
-                  <div
-                    className="w-14 h-14 rounded-2xl bg-blue-600 flex flex-col
-                                  items-center justify-center text-white shrink-0"
-                  >
-                    <span className="text-xs font-semibold">
-                      {nextApt.month}
-                    </span>
-                    <span className="text-xl font-bold leading-tight">
-                      {nextApt.day}
-                    </span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-slate-900">
-                        {nextApt.service}
-                      </span>
-                      <Pill status={nextApt.status} />
-                    </div>
-                    <p className="text-slate-500 text-sm mt-1">
-                      {nextApt.provider}
-                    </p>
-                    <div className="flex items-center gap-4 mt-2 text-slate-400 text-sm">
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5" /> {nextApt.time}
-                      </span>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() =>
-                      navigate(`/client/appointments/${nextApt.id}`)
-                    }
-                    className="flex items-center gap-1.5 text-blue-600 font-semibold
-                               text-sm hover:text-blue-700 shrink-0"
-                  >
-                    <Eye className="w-4 h-4" /> View
-                  </button>
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-2xl mb-2">📅</p>
-                  <p className="font-semibold text-slate-900">
-                    No upcoming appointments
-                  </p>
-                  <p className="text-slate-400 text-sm mt-1">
-                    Book your first appointment to get started.
-                  </p>
-                  <button
-                    onClick={() => navigate("/client/book")}
-                    className="mt-4 px-4 py-2 rounded-xl bg-blue-600 text-white
-                               font-semibold text-sm hover:bg-blue-700 transition-colors"
-                  >
-                    Book Now
-                  </button>
-                </div>
-              )}
+              <button
+                onClick={() => navigate("/client/appointments")}
+                className="flex items-center gap-1 text-blue-600 text-sm
+                           font-semibold hover:text-blue-700"
+              >
+                View all <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
-
-            {/* Upcoming appointments */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h3
-                  className="font-bold text-slate-900"
-                  style={{ fontFamily: "Poppins" }}
-                >
-                  Upcoming Appointments
-                </h3>
+            {upcomingApts.length === 0 ? (
+              <div className="text-center py-8">
+                <Calendar className="w-12 h-12 text-slate-300 mx-auto mb-2" />
+                <p className="font-semibold text-slate-900">No upcoming appointments</p>
+                <p className="text-slate-400 text-sm mt-1">Book your first appointment to get started.</p>
                 <button
-                  onClick={() => navigate("/client/appointments")}
-                  className="flex items-center gap-1 text-blue-600 text-sm
-                             font-semibold hover:text-blue-700"
+                  onClick={() => navigate("/client/book")}
+                  className="mt-4 px-4 py-2 rounded-xl bg-blue-600 text-white
+                             font-semibold text-sm hover:bg-blue-700 transition-colors"
                 >
-                  View all <ChevronRight className="w-4 h-4" />
+                  Book Now
                 </button>
               </div>
-              {upcomingApts.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-slate-400 text-sm">
-                    No upcoming appointments.
-                  </p>
-                </div>
-              ) : (
-                upcomingApts.map((apt) => (
-                  <AptRow
-                    key={apt.id}
-                    apt={apt}
-                    onView={handleView}
-                    onReschedule={handleReschedule}
-                    onCancel={handleCancel}
-                  />
-                ))
-              )}
-            </div>
+            ) : (
+              upcomingApts.map((apt) => (
+                <AptRow
+                  key={apt.id}
+                  apt={apt}
+                  onView={handleView}
+                  onReschedule={handleReschedule}
+                  onCancel={handleCancel}
+                />
+              ))
+            )}
           </div>
 
-          {/* Right col */}
-          <div className="space-y-6">
-            {/* Quick Book */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+          {/* Recent Notifications */}
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+            <div className="flex items-center justify-between mb-4">
               <h3
-                className="font-bold text-slate-900 mb-4"
+                className="font-bold text-slate-900"
                 style={{ fontFamily: "Poppins" }}
               >
-                Quick Book
+                Recent Notifications
               </h3>
-              <div className="flex flex-col gap-4">
-                <div>
-                  <label
-                    className="block text-xs font-semibold text-slate-500
-                                    uppercase tracking-wide mb-1.5"
-                  >
-                    Service
-                  </label>
-                  <select
-                    value={service}
-                    onChange={(e) => setService(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200
-                               bg-white text-slate-900 text-sm focus:outline-none
-                               focus:ring-2 focus:ring-blue-400"
-                  >
-                    {SERVICES.map((s) => (
-                      <option key={s}>{s}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label
-                    className="block text-xs font-semibold text-slate-500
-                                    uppercase tracking-wide mb-1.5"
-                  >
-                    Provider
-                  </label>
-                  <select
-                    value={provider}
-                    onChange={(e) => setProvider(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200
-                               bg-white text-slate-900 text-sm focus:outline-none
-                               focus:ring-2 focus:ring-blue-400"
-                  >
-                    {PROVIDERS.map((p) => (
-                      <option key={p}>{p}</option>
-                    ))}
-                  </select>
-                </div>
-                <button
-                  onClick={() =>
-                    navigate(
-                      `/client/book?service=${service}&provider=${provider}`,
-                    )
-                  }
-                  className="w-full py-3 rounded-xl bg-blue-600 text-white font-semibold
-                             text-sm hover:bg-blue-700 transition-colors flex items-center
-                             justify-center gap-2"
-                >
-                  Find Slots <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
+              <button
+                onClick={() => navigate("/client/notifications")}
+                className="flex items-center gap-1 text-blue-600 text-sm
+                           font-semibold hover:text-blue-700"
+              >
+                See all <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
-
-            {/* Recent Notifications */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h3
-                  className="font-bold text-slate-900"
-                  style={{ fontFamily: "Poppins" }}
-                >
-                  Recent Notifications
-                </h3>
-                <button
-                  onClick={() => navigate("/client/notifications")}
-                  className="flex items-center gap-1 text-blue-600 text-sm
-                             font-semibold hover:text-blue-700"
-                >
-                  See all <ChevronRight className="w-4 h-4" />
-                </button>
+            {notifications.length === 0 ? (
+              <div className="text-center py-6">
+                <Bell className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                <p className="text-slate-400 text-sm">No notifications yet.</p>
               </div>
-              {notifications.length === 0 ? (
-                <div className="text-center py-6">
-                  <p className="text-2xl mb-2">🔔</p>
-                  <p className="text-slate-400 text-sm">
-                    No notifications yet.
-                  </p>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-4">
-                  {notifications.map((n) => (
-                    <div key={n.id} className="flex items-start gap-3">
+            ) : (
+              <div className="flex flex-col gap-3">
+                {notifications.map((n) => {
+                  const cfg = NOTIF_ICONS[n.type] || NOTIF_ICONS.system;
+                  const Icon = cfg.icon;
+                  return (
+                    <div
+                      key={n.id || n._id}
+                      onClick={() => navigate("/client/notifications")}
+                      className="flex items-start gap-3 p-2 rounded-xl hover:bg-slate-50 cursor-pointer transition-colors"
+                    >
                       <div
-                        className={`w-9 h-9 rounded-xl flex items-center justify-center
-                                      shrink-0 text-base ${n.iconBg}`}
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${cfg.bg}`}
                       >
-                        {n.icon}
+                        <Icon className={`w-4 h-4 ${cfg.color}`} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-slate-900">
+                        <p className={`text-sm text-slate-900 ${n.unread ? "font-bold" : "font-semibold"}`}>
                           {n.title}
                         </p>
-                        <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+                        <p className="text-xs text-slate-400 mt-0.5 leading-relaxed truncate">
                           {n.message}
                         </p>
                       </div>
                       {n.unread && (
-                        <span className="relative flex h-2.5 w-2.5 shrink-0 mt-1">
-                          <span
-                            className="animate-ping absolute inline-flex h-full w-full
-                                          rounded-full bg-blue-400 opacity-75"
-                          />
-                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-600" />
-                        </span>
+                        <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0 mt-2" />
                       )}
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       </div>
