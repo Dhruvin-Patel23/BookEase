@@ -3,19 +3,30 @@ const cors = require("cors");
 
 const app = express();
 
-app.use(cors());
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:5000",
+  process.env.FRONTEND_URL,
+].filter(Boolean);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // allow requests with no origin (e.g. mobile apps, curl, server-to-server)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      if (origin.endsWith(".vercel.app")) return callback(null, true);
+      return callback(null, true);
+    },
+    credentials: true,
+  }),
+);
 app.use(express.json({ limit: "10mb" }));
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
-app.use(
-  cors({
-    origin: "http://localhost:5173", // your Vite dev server
-    credentials: true,
-  }),
-);
 // routes will be mounted here as we build each page
 app.use("/api/auth", require("./routes/auth.routes"));
 app.use("/api/provider", require("./routes/provider.routes"));
