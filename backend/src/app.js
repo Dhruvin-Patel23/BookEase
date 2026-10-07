@@ -23,9 +23,14 @@ app.use(
 );
 app.use(express.json({ limit: "10mb" }));
 
+app.get("/", (req, res) => {
+  res.json({ message: "BookEase API is running successfully!", status: "ok" });
+});
+
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
+
 
 // routes will be mounted here as we build each page
 app.use("/api/auth", require("./routes/auth.routes"));
